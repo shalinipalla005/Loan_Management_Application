@@ -11,34 +11,47 @@ app.use(express.json());
 // Initialize database and sync models
 async function initializeDatabase() {
   try {
+    // Test database connection
     await sequelize.authenticate();
     console.log('Database connection established.');
     
-    // Sync all models
-    // Note: In production, you might want to use migrations instead
+    // Sync all models with the database
     await sequelize.sync({ alter: true });
     console.log('Database models synchronized.');
   } catch (error) {
-    console.error('Unable to connect to the database:', error);
+    console.error('Database initialization error:', error);
+    process.exit(1); // Exit if database initialization fails
   }
 }
 
 // Routes setup (to be added by team)
-// app.use('/api/members', require('./routes/memberRoutes'));
-// app.use('/api/loans', require('./routes/loanRoutes'));
-// app.use('/api/societies', require('./routes/societyRoutes'));
+app.use('/api/members', require('./routes/memberRoutes'));
+// Add more routes here as they are created
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  res.status(500).json({ 
+    error: 'Something went wrong!',
+    message: err.message 
+  });
 });
 
+// Start server
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, async () => {
-  console.log(`Server is running on port ${PORT}`);
-  await initializeDatabase();
-});
+async function startServer() {
+  try {
+    await initializeDatabase();
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 module.exports = app;
