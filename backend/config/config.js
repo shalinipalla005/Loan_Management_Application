@@ -5,17 +5,8 @@ module.exports = {
   port: process.env.PORT || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
 
-  // Database configuration
-  databaseUrl: process.env.DATABASE_URL,
-  database: {
-    type: process.env.DB_TYPE || 'sqlite',
-    name: process.env.DB_NAME || 'loan_management',
-    path: process.env.DB_PATH || './models/loan_management.db',
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
-  },
+  // SQLite Database configuration (only)
+  databaseUrl: process.env.DATABASE_URL || 'sqlite:./models/loan_management.db',
 
   // JWT configuration
   jwt: {
