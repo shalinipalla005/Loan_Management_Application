@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { sequelize } = require('./models');
+const outstandingInterestRoutes = require('./routes/outstandingInterestRoutes');
 
 const app = express();
 
@@ -53,5 +54,9 @@ async function startServer() {
 }
 
 startServer();
+
+
+app.use('/api/loans', outstandingInterestRoutes);
+
 
 module.exports = app;
