@@ -10,6 +10,7 @@ app.use(express.json());
 
 const exportRoutes = require('./routes/exportRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const loanProfileRoutes = require('./routes/loanprofileRoutes');
 
 // Initialize database and sync models
 async function initializeDatabase() {
@@ -31,6 +32,7 @@ async function initializeDatabase() {
 app.use('/api/members', require('./routes/memberRoutes'));
 app.use('/api', exportRoutes);
 app.use('/api', dashboardRoutes);
+app.use('/api/loanprofiles', loanProfileRoutes);
 // Add more routes here as they are created
 
 // app.post('/api/loans/test-create', async (req, res) => {
