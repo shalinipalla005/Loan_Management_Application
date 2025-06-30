@@ -3,7 +3,7 @@ const { Op } = require("sequelize");
 
 async function getLoansWithOutstandingInterest(req, res) {
   const page = parseInt(req.query.page) || 1;
-  const limit = 20; // Changed from 10 to 20
+  const limit = 20; 
   const offset = (page - 1) * limit;
   
   try {
@@ -27,7 +27,7 @@ async function getLoansWithOutstandingInterest(req, res) {
       },
       limit,
       offset,
-      order: [["outstanding_interest", "DESC"]] // Changed to order by outstanding_interest in descending order
+      order: [["outstanding_interest", "DESC"]] 
     });
     
     res.json({
