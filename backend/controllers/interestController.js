@@ -2,8 +2,12 @@ const Loan = require('../models/Loan');
 const { Op } = require("sequelize");
 
 async function getLoansWithOutstandingInterest(req, res) {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 20; // Changed from 10 to 20
+  const offset = (page - 1) * limit;
+  
   try {
-    const loans = await Loan.findAll({
+    const { count, rows: loans } = await Loan.findAndCountAll({
       attributes: [
         "loan_id",
         "loan_number",
@@ -20,13 +24,23 @@ async function getLoansWithOutstandingInterest(req, res) {
         outstanding_interest: {
           [Op.gt]: 0
         }
-      }
+      },
+      limit,
+      offset,
+      order: [["outstanding_interest", "DESC"]] // Changed to order by outstanding_interest in descending order
     });
-    res.json(loans);
+    
+    res.json({
+      currentPage: page,
+      totalPages: Math.ceil(count / limit),
+      totalRecords: count,
+      data: loans
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 }
+
 
 async function getLoansWithOutstandingInterestById(req, res) {
   const { loanId } = req.params;

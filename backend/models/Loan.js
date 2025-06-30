@@ -28,4 +28,4 @@ const Loan = sequelize.define('Loan', {
   timestamps: false,
 });
 
-module.exports = Loan; 
+module.exports = Loan;

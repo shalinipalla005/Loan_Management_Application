@@ -8,6 +8,7 @@ const LoanProduct = require('./LoanProduct');
 // Associations
 Member.belongsTo(Society, { foreignKey: 'society_id' });
 Loan.belongsTo(Member, { foreignKey: 'member_id' });
+Member.hasMany(Loan, { foreignKey: 'member_id' });
 Loan.belongsTo(Society, { foreignKey: 'society_id' });
 Loan.belongsTo(LoanOfficer, { foreignKey: 'officer_id' });
 Loan.belongsTo(LoanProduct, { foreignKey: 'product_id' });
@@ -21,4 +22,4 @@ module.exports = {
   Society,
   LoanOfficer,
   LoanProduct,
-}; 
+};
