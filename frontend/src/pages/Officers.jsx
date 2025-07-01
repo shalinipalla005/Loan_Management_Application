@@ -104,134 +104,138 @@ export default function Officers() {
   };
 
   return (
-    <Paper sx={{ p: 3, bgcolor: '#E7EFC7' }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Loan Officers</Typography>
-        <Button 
-          variant="contained" 
-          onClick={() => handleOpen()} 
-          disabled={loading || !isAdmin}
-          sx={{ bgcolor: '#8A784E', '&:hover': { bgcolor: '#3B3B1A' } }}
-        >
-          Add Officer
-        </Button>
-      </Box>
-      {!isAdmin && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Only admins can add, edit, or delete officers. You have view-only access.
-        </Alert>
-      )}
-      {loading && <Typography>Loading...</Typography>}
-      
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableCell>Name</TableCell>
-            <TableCell>Employee ID</TableCell>
-            <TableCell>Contact</TableCell>
-            <TableCell>Email</TableCell>
-            <TableCell>Designation</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Actions</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {officers.map(off => (
-            <TableRow key={off.officer_id}>
-              <TableCell>{off.officer_name}</TableCell>
-              <TableCell>{off.employee_id}</TableCell>
-              <TableCell>{off.contact_number || '-'}</TableCell>
-              <TableCell>{off.email || '-'}</TableCell>
-              <TableCell>{off.designation || '-'}</TableCell>
-              <TableCell>{off.status}</TableCell>
-              <TableCell>
-                <Button 
-                  onClick={() => handleOpen(off)}
-                  disabled={loading || !isAdmin}
-                  size="small"
-                  sx={{ mr: 1 }}
-                >
-                  Edit
-                </Button>
-                <Button 
-                  color="error" 
-                  onClick={() => handleDelete(off.officer_id)}
-                  disabled={loading || !isAdmin}
-                  size="small"
-                >
-                  Delete
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <Box sx={{ display: 'flex', bgcolor: 'background.default', minHeight: '100vh' }}>
+      <Box sx={{ flexGrow: 1, width: '100%' }}>
+        <Paper sx={{ width: '100%', maxWidth: '100%', mx: 0, p: 3, bgcolor: 'background.default', boxShadow: 2 }}>
+          <Typography variant="h4" sx={{ mb: 3, fontWeight: 700, color: 'primary.main' }}>Officers</Typography>
+          <Box display="flex" justifyContent="flex-end" mb={2}>
+            <Button 
+              variant="contained" 
+              onClick={() => handleOpen()} 
+              disabled={loading || !isAdmin}
+              sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
+            >
+              Add Officer
+            </Button>
+          </Box>
+          {!isAdmin && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Only admins can add, edit, or delete officers. You have view-only access.
+            </Alert>
+          )}
+          {loading && <Typography>Loading...</Typography>}
+          
+          <Table>
+            <TableHead>
+              <TableRow sx={{ bgcolor: 'primary.light' }}>
+                <TableCell>Name</TableCell>
+                <TableCell>Employee ID</TableCell>
+                <TableCell>Contact</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Designation</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {officers.map(officer => (
+                <TableRow key={officer.officer_id}>
+                  <TableCell>{officer.officer_name}</TableCell>
+                  <TableCell>{officer.employee_id}</TableCell>
+                  <TableCell>{officer.contact_number || '-'}</TableCell>
+                  <TableCell>{officer.email || '-'}</TableCell>
+                  <TableCell>{officer.designation}</TableCell>
+                  <TableCell>{officer.status}</TableCell>
+                  <TableCell>
+                    <Button 
+                      onClick={() => handleOpen(officer)}
+                      disabled={loading || !isAdmin}
+                      size="small"
+                      sx={{ mr: 1 }}
+                    >
+                      Edit
+                    </Button>
+                    <Button 
+                      color="error" 
+                      onClick={() => handleDelete(officer.officer_id)}
+                      disabled={loading || !isAdmin}
+                      size="small"
+                    >
+                      Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
 
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>{editId ? 'Edit Officer' : 'Add Officer'}</DialogTitle>
-        <DialogContent>
-          <TextField
-            label="Officer Name *"
-            value={form.officer_name}
-            onChange={e => setForm(f => ({ ...f, officer_name: e.target.value }))}
-            fullWidth margin="normal" required
-            disabled={!isAdmin}
-          />
-          <TextField
-            label="Contact Number"
-            value={form.contact_number}
-            onChange={e => setForm(f => ({ ...f, contact_number: e.target.value }))}
-            fullWidth margin="normal"
-            disabled={!isAdmin}
-          />
-          <TextField
-            label="Email"
-            value={form.email}
-            onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-            fullWidth margin="normal" type="email"
-            disabled={!isAdmin}
-          />
-          <TextField
-            label="Designation"
-            value={form.designation}
-            onChange={e => setForm(f => ({ ...f, designation: e.target.value }))}
-            fullWidth margin="normal"
-            disabled={!isAdmin}
-          />
-          {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose} disabled={loading}>Cancel</Button>
-          <Button 
-            onClick={handleSubmit} 
-            variant="contained" 
-            disabled={loading || !form.officer_name || !isAdmin}
-            sx={{ bgcolor: '#8A784E', '&:hover': { bgcolor: '#3B3B1A' } }}
+          <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+            <DialogTitle>{editId ? 'Edit Officer' : 'Add Officer'}</DialogTitle>
+            <DialogContent>
+              <TextField
+                label="Officer Name *"
+                value={form.officer_name}
+                onChange={e => setForm(f => ({ ...f, officer_name: e.target.value }))}
+                fullWidth margin="normal" required
+                disabled={!isAdmin}
+              />
+              <TextField
+                label="Contact Number"
+                value={form.contact_number}
+                onChange={e => setForm(f => ({ ...f, contact_number: e.target.value }))}
+                fullWidth margin="normal"
+                disabled={!isAdmin}
+              />
+              <TextField
+                label="Email"
+                value={form.email}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                fullWidth margin="normal" type="email"
+                disabled={!isAdmin}
+              />
+              <TextField
+                label="Designation"
+                value={form.designation}
+                onChange={e => setForm(f => ({ ...f, designation: e.target.value }))}
+                fullWidth margin="normal"
+                disabled={!isAdmin}
+              />
+              {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleClose} disabled={loading}>Cancel</Button>
+              <Button 
+                onClick={handleSubmit} 
+                variant="contained" 
+                disabled={loading || !form.officer_name || !isAdmin}
+                sx={{ bgcolor: '#8A784E', '&:hover': { bgcolor: '#3B3B1A' } }}
+              >
+                {loading ? 'Saving...' : 'Save'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          <Snackbar 
+            open={!!success} 
+            autoHideDuration={6000} 
+            onClose={() => setSuccess('')}
           >
-            {loading ? 'Saving...' : 'Save'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+            <Alert severity="success" onClose={() => setSuccess('')}>
+              {success}
+            </Alert>
+          </Snackbar>
 
-      <Snackbar 
-        open={!!success} 
-        autoHideDuration={6000} 
-        onClose={() => setSuccess('')}
-      >
-        <Alert severity="success" onClose={() => setSuccess('')}>
-          {success}
-        </Alert>
-      </Snackbar>
-
-      <Snackbar 
-        open={!!error} 
-        autoHideDuration={6000} 
-        onClose={() => setError('')}
-      >
-        <Alert severity="error" onClose={() => setError('')}>
-          {error}
-        </Alert>
-      </Snackbar>
-    </Paper>
+          <Snackbar 
+            open={!!error} 
+            autoHideDuration={6000} 
+            onClose={() => setError('')}
+          >
+            <Alert severity="error" onClose={() => setError('')}>
+              {error}
+            </Alert>
+          </Snackbar>
+        </Paper>
+      </Box>
+    </Box>
   );
 } 

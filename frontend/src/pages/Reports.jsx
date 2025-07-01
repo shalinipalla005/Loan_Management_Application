@@ -6,7 +6,7 @@ function DataTable({ columns, rows }) {
   return (
     <Table>
       <TableHead>
-        <TableRow>
+        <TableRow sx={{ bgcolor: 'primary.light' }}>
           {columns.map(col => <TableCell key={col}>{col}</TableCell>)}
         </TableRow>
       </TableHead>
@@ -34,18 +34,22 @@ export default function Reports() {
   }, []);
 
   return (
-    <Paper style={{ padding: 24 }}>
-      <Typography variant="h4" gutterBottom>Reports</Typography>
-      <Tabs value={tab} onChange={(_, v) => setTab(v)}>
-        <Tab label="Loan Summary" />
-        <Tab label="Overdue Loans" />
-        <Tab label="Monthly Collections" />
-      </Tabs>
-      <Box mt={2}>
-        {tab === 0 && <DataTable columns={loanSummary[0] ? Object.keys(loanSummary[0]) : []} rows={loanSummary} />}
-        {tab === 1 && <DataTable columns={overdueLoans[0] ? Object.keys(overdueLoans[0]) : []} rows={overdueLoans} />}
-        {tab === 2 && <DataTable columns={monthlyCollections[0] ? Object.keys(monthlyCollections[0]) : []} rows={monthlyCollections} />}
+    <Box sx={{ display: 'flex', bgcolor: 'background.default', minHeight: '100vh' }}>
+      <Box sx={{ flexGrow: 1, width: '100%' }}>
+        <Paper sx={{ width: '100%', maxWidth: '100%', mx: 0, p: 3, bgcolor: 'background.default', boxShadow: 2 }}>
+          <Typography variant="h4" sx={{ mb: 3, fontWeight: 700, color: 'primary.main' }}>Reports</Typography>
+          <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ bgcolor: 'primary.light', borderRadius: 2 }}>
+            <Tab label="Loan Summary" />
+            <Tab label="Overdue Loans" />
+            <Tab label="Monthly Collections" />
+          </Tabs>
+          <Box mt={2}>
+            {tab === 0 && <DataTable columns={loanSummary[0] ? Object.keys(loanSummary[0]) : []} rows={loanSummary} />}
+            {tab === 1 && <DataTable columns={overdueLoans[0] ? Object.keys(overdueLoans[0]) : []} rows={overdueLoans} />}
+            {tab === 2 && <DataTable columns={monthlyCollections[0] ? Object.keys(monthlyCollections[0]) : []} rows={monthlyCollections} />}
+          </Box>
+        </Paper>
       </Box>
-    </Paper>
+    </Box>
   );
 } 

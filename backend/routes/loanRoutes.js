@@ -7,5 +7,8 @@ router.get('/:id', controller.get);
 router.post('/', controller.create);
 router.put('/:id', controller.update);
 router.delete('/:id', controller.delete);
+router.patch('/:id/clear', controller.clearLoan);
+router.get('/:id/dues', controller.getLoanDues);
+router.get('/:id/savings', controller.getLoanSavings);
 
 module.exports = router; 

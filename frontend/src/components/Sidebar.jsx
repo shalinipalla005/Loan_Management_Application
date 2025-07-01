@@ -53,35 +53,54 @@ export default function Sidebar() {
       sx={{
         width: drawerWidth,
         flexShrink: 0,
-        [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box', bgcolor: '#F5F5E6' },
+        [`& .MuiDrawer-paper`]: {
+          width: drawerWidth,
+          boxSizing: 'border-box',
+          bgcolor: 'background.paper',
+          borderRight: '1px solid #e0e0e0',
+          boxShadow: 2,
+        },
       }}
     >
-      <Toolbar>
-        <Box width="100%" display="flex" alignItems="center" justifyContent="space-between">
-          <Typography variant="h6" noWrap>Loan App</Typography>
+      <Toolbar sx={{ minHeight: 64 }} />
+      <Box sx={{ px: 2, py: 1 }}>
+        <Typography variant="h6" noWrap color="primary.main" sx={{ fontWeight: 700, mb: 2, letterSpacing: 1 }}>
+          Loan App
+        </Typography>
+        <List>
+          {menu.map(item => (
+            <ListItem
+              component="button"
+              key={item.text}
+              selected={location.pathname === item.path}
+              onClick={() => navigate(item.path)}
+              sx={{
+                borderRadius: 2,
+                mb: 0.5,
+                bgcolor: location.pathname === item.path ? 'primary.light' : 'inherit',
+                color: location.pathname === item.path ? 'primary.main' : 'text.primary',
+                '&:hover': {
+                  bgcolor: 'primary.lighter',
+                  color: 'primary.main',
+                },
+              }}
+            >
+              <ListItemIcon sx={{ color: 'inherit' }}>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.text} />
+            </ListItem>
+          ))}
+        </List>
+        <Box mt={4} textAlign="center">
           <Typography
             variant="body2"
-            color="primary"
-            sx={{ cursor: 'pointer', ml: 2 }}
+            color="error"
+            sx={{ cursor: 'pointer', fontWeight: 500 }}
             onClick={handleLogout}
           >
             Logout
           </Typography>
         </Box>
-      </Toolbar>
-      <List>
-        {menu.map(item => (
-          <ListItem
-            button
-            key={item.text}
-            selected={location.pathname === item.path}
-            onClick={() => navigate(item.path)}
-          >
-            <ListItemIcon>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItem>
-        ))}
-      </List>
+      </Box>
     </Drawer>
   );
 } 

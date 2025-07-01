@@ -99,6 +99,14 @@ module.exports = {
         type: Sequelize.STRING,
         defaultValue: 'PENDING'
       },
+      cleared_by_official: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false
+      },
+      cleared_at: {
+        type: Sequelize.DATE,
+        allowNull: true
+      },
       created_at: {
         type: Sequelize.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
