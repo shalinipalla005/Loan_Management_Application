@@ -1,38 +1,84 @@
 const { Payment } = require('../models');
+const IDGenerator = require('../utils/idGenerator');
 
 exports.list = async (req, res) => {
-  const payments = await Payment.findAll();
-  res.json(payments);
+  try {
+    const payments = await Payment.findAll({
+      order: [['created_at', 'DESC']]
+    });
+    res.json(payments);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
 exports.get = async (req, res) => {
-  const payment = await Payment.findByPk(req.params.id);
-  if (!payment) return res.status(404).json({ error: 'Not found' });
-  res.json(payment);
+  try {
+    const payment = await Payment.findByPk(req.params.id);
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
+    res.json(payment);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
 exports.create = async (req, res) => {
   try {
+    // Auto-generate receipt number if not provided
+    if (!req.body.receipt_number) {
+      req.body.receipt_number = await IDGenerator.generateReceiptNumber();
+    }
+    
+    // Set default values
+    req.body.payment_date = req.body.payment_date || new Date();
+    req.body.principal_paid = req.body.principal_paid || 0.00;
+    req.body.interest_paid = req.body.interest_paid || 0.00;
+    req.body.savings_paid = req.body.savings_paid || 0.00;
+    req.body.penalty_paid = req.body.penalty_paid || 0.00;
+    req.body.payment_method = req.body.payment_method || 'CASH';
+    
+    // Get member_id from loan if not provided
+    if (!req.body.member_id && req.body.loan_id) {
+      const { Loan } = require('../models');
+      const loan = await Loan.findByPk(req.body.loan_id);
+      if (loan) {
+        req.body.member_id = loan.member_id;
+      }
+    }
+    
     const payment = await Payment.create(req.body);
     res.status(201).json(payment);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      res.status(400).json({ error: 'Receipt number already exists' });
+    } else {
+      res.status(400).json({ error: err.message });
+    }
   }
 };
 
 exports.update = async (req, res) => {
   try {
-    const [count] = await Payment.update(req.body, { where: { payment_id: req.params.id } });
-    if (!count) return res.status(404).json({ error: 'Not found' });
-    const updated = await Payment.findByPk(req.params.id);
-    res.json(updated);
+    const payment = await Payment.findByPk(req.params.id);
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
+    await payment.update(req.body);
+    res.json(payment);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      res.status(400).json({ error: 'Receipt number already exists' });
+    } else {
+      res.status(400).json({ error: err.message });
+    }
   }
 };
 
 exports.delete = async (req, res) => {
-  const count = await Payment.destroy({ where: { payment_id: req.params.id } });
-  if (!count) return res.status(404).json({ error: 'Not found' });
-  res.json({ success: true });
+  try {
+    const payment = await Payment.findByPk(req.params.id);
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
+    await payment.destroy();
+    res.json({ message: 'Payment deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }; 

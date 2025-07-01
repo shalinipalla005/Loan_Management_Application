@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const { sequelize } = require('./models');
+const { LoanOfficer } = require('./models');
+const bcrypt = require('bcrypt');
 
 const app = express();
 
@@ -12,7 +14,6 @@ const exportRoutes = require('./routes/exportRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const loanProfileRoutes = require('./routes/loanprofileRoutes');
 const authRoutes = require('./routes/authRoutes');
-const memberSavingsRoutes = require('./routes/memberSavingsRoutes');
 const penaltyRoutes = require('./routes/penaltyRoutes');
 const loanProductRoutes = require('./routes/loanProductRoutes');
 const loanRoutes = require('./routes/loanRoutes');
@@ -31,9 +32,9 @@ async function initializeDatabase() {
     await sequelize.authenticate();
     console.log('Database connection established.');
     
-    // Sync all models with the database
-    await sequelize.sync({ alter: true });
-    console.log('Database models synchronized.');
+    // Note: Database schema is now managed through migrations
+    // Run migrations with: npx sequelize-cli db:migrate
+    console.log('Database models synchronized via migrations.');
 
     // --- CREATE TRIGGERS, VIEWS, AND INITIAL DATA ---
     // Enable foreign key constraints
@@ -181,19 +182,39 @@ async function initializeDatabase() {
   }
 }
 
+async function seedInitialAdminOfficer() {
+  const adminExists = await LoanOfficer.findOne({ where: { role: 'admin' } });
+  if (!adminExists) {
+    const password = 'admin123';
+    const hash = await bcrypt.hash(password, 10);
+    const admin = await LoanOfficer.create({
+      officer_name: 'System Admin',
+      employee_id: 'ADMIN001',
+      email: 'admin@bank.com',
+      password: hash,
+      role: 'admin',
+      status: 'ACTIVE'
+    });
+    console.log('--- Initial Admin Officer Created ---');
+    console.log('Employee ID:', admin.employee_id);
+    console.log('Email:', admin.email);
+    console.log('Password:', password);
+    console.log('-------------------------------------');
+  }
+}
+
 // Routes setup (to be added by team)
 app.use('/api/members', require('./routes/memberRoutes'));
 app.use('/api', exportRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api/loanprofiles', loanProfileRoutes);
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/societies', require('./routes/societyRoutes'));
 app.use('/api/loan-officers', require('./routes/loanOfficerRoutes'));
 app.use('/api/loan-products', require('./routes/loanProductRoutes'));
 app.use('/api/loans', require('./routes/loanRoutes'));
 app.use('/api/repayment-schedules', require('./routes/repaymentScheduleRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
-app.use('/api/member-savings', require('./routes/memberSavingsRoutes'));
 app.use('/api/penalties', require('./routes/penaltyRoutes'));
 app.use('/api/loan-status-history', require('./routes/loanStatusHistoryRoutes'));
 app.use('/api/member-documents', require('./routes/memberDocumentRoutes'));
@@ -276,6 +297,7 @@ const PORT = process.env.PORT || 3000;
 async function startServer() {
   try {
     await initializeDatabase();
+    await seedInitialAdminOfficer();
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });

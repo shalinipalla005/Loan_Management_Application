@@ -38,7 +38,7 @@ MemberDocument.belongsTo(Member, { foreignKey: 'member_id' });
 MemberDocument.belongsTo(LoanOfficer, { foreignKey: 'uploaded_by' });
 AuditLog.belongsTo(LoanOfficer, { foreignKey: 'user_id' });
 
-const getUserIdFromOptions = (options) => (options && options.user && options.user.member_id) ? options.user.member_id : null;
+const getUserIdFromOptions = (options) => (options && options.user && options.user.officer_id) ? options.user.officer_id : null;
 const getIpFromOptions = (options) => (options && options.ip) ? options.ip : null;
 
 function addAuditHooks(model, modelName) {

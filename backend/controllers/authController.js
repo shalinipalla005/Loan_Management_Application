@@ -1,49 +1,32 @@
-const { Member } = require('../models');
+const { LoanOfficer } = require('../models');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const config = require('../config/config');
 
-// Register a new member (user)
-async function register(req, res) {
-  try {
-    const { member_name, membership_number, password, society_id } = req.body;
-    if (!member_name || !membership_number || !password || !society_id) {
-      return res.status(400).json({ error: 'All fields are required.' });
-    }
-    const existing = await Member.findOne({ where: { membership_number } });
-    if (existing) {
-      return res.status(409).json({ error: 'Membership number already exists.' });
-    }
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const member = await Member.create({
-      member_name,
-      membership_number,
-      password: hashedPassword,
-      society_id
-    });
-    res.status(201).json({ message: 'Registration successful', member_id: member.member_id });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-}
-
-// Login
+// Officer Login
 async function login(req, res) {
   try {
-    const { membership_number, password } = req.body;
-    if (!membership_number || !password) {
-      return res.status(400).json({ error: 'Membership number and password are required.' });
+    const { identifier, password } = req.body; // identifier = employee_id or email
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Employee ID/Email and password are required.' });
     }
-    const member = await Member.findOne({ where: { membership_number } });
-    if (!member || !member.password) {
+    const officer = await LoanOfficer.findOne({
+      where: {
+        [require('sequelize').Op.or]: [
+          { employee_id: identifier },
+          { email: identifier }
+        ]
+      }
+    });
+    if (!officer || !officer.password) {
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
-    const valid = await bcrypt.compare(password, member.password);
+    const valid = await bcrypt.compare(password, officer.password);
     if (!valid) {
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
     const token = jwt.sign(
-      { member_id: member.member_id, membership_number: member.membership_number, society_id: member.society_id },
+      { officer_id: officer.officer_id, employee_id: officer.employee_id, email: officer.email, role: officer.role },
       config.jwt.secret,
       { expiresIn: config.jwt.expiresIn }
     );
@@ -53,4 +36,35 @@ async function login(req, res) {
   }
 }
 
-module.exports = { register, login }; 
+// Officer Register (admin only)
+async function register(req, res) {
+  try {
+    // Only admin can register officers (middleware should check this)
+    const { officer_name, employee_id, email, password, role, society_id, contact_number, designation, hire_date, status } = req.body;
+    if (!officer_name || !employee_id || !email || !password || !role) {
+      return res.status(400).json({ error: 'All fields are required.' });
+    }
+    const existing = await LoanOfficer.findOne({ where: { [require('sequelize').Op.or]: [{ employee_id }, { email }] } });
+    if (existing) {
+      return res.status(409).json({ error: 'Employee ID or email already exists.' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const officer = await LoanOfficer.create({
+      officer_name,
+      employee_id,
+      email,
+      password: hashedPassword,
+      role,
+      society_id,
+      contact_number,
+      designation,
+      hire_date,
+      status: status || 'ACTIVE'
+    });
+    res.status(201).json({ message: 'Officer registered successfully', officer_id: officer.officer_id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
+module.exports = { login, register }; 
