@@ -5,6 +5,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Typography, 
   Paper, Box, Alert, Snackbar, MenuItem, TableContainer 
 } from '@mui/material';
+import GetAppIcon from '@mui/icons-material/GetApp';
 
 export default function Loans() {
   const [loans, setLoans] = useState([]);
@@ -27,6 +28,7 @@ export default function Loans() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileLoan, setProfileLoan] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -110,6 +112,50 @@ export default function Loans() {
     }
   };
 
+  const handleExportLoan = async (loanId) => {
+    try {
+      setExportLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/loans/${loanId}/export`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to export loan');
+      }
+
+      const blob = await response.blob();
+      
+      // Get filename from response headers
+      const disposition = response.headers.get('Content-Disposition');
+      let filename = `loan_${loanId}_export.xlsx`;
+      if (disposition && disposition.includes('filename=')) {
+        filename = disposition.split('filename=')[1].replace(/"/g, '');
+      }
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      setSuccess('Loan exported successfully');
+    } catch (err) {
+      setError('Failed to export loan');
+      console.error('Export error:', err);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   const getMemberName = (memberId) => {
     const member = members.find(m => m.member_id === memberId);
     return member ? member.member_name : 'Unknown';
@@ -142,7 +188,7 @@ export default function Loans() {
   };
 
   return (
-    <Box sx={{ display: 'flex', bgcolor: 'background.default', minHeight: '100vh', width: '100vw', overflowX: 'hidden' }}>
+    <Box sx={{ display: 'flex', bgcolor: 'background.default', minHeight: '100vh' }}>
       <Box sx={{ flexGrow: 1, width: '100%' }}>
         <Paper sx={{ width: '100%', maxWidth: '100%', mx: 0, p: 3, bgcolor: 'background.default', boxShadow: 2 }}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -158,7 +204,7 @@ export default function Loans() {
           </Box>
           {loading && <Typography>Loading...</Typography>}
           <TableContainer sx={{ width: '100%' }}>
-            <Table sx={{ width: '100%' }}>
+            <Table>
               <TableHead>
                 <TableRow sx={{ bgcolor: 'primary.light' }}>
                   <TableCell>Loan Number</TableCell>
@@ -172,7 +218,7 @@ export default function Loans() {
               </TableHead>
               <TableBody>
                 {loans.map(loan => (
-                  <TableRow key={loan.loan_id}>
+                  <TableRow key={loan.loan_id} sx={{ bgcolor: 'background.default' }}>
                     <TableCell>{loan.loan_number}</TableCell>
                     <TableCell>{getMemberName(loan.member_id)}</TableCell>
                     <TableCell>{getOfficerName(loan.officer_id)}</TableCell>
@@ -193,10 +239,32 @@ export default function Loans() {
                         onClick={() => handleDelete(loan.loan_id)}
                         disabled={loading}
                         size="small"
+                        sx={{ mr: 1 }}
                       >
                         Delete
                       </Button>
-                      <Button onClick={() => handleOpenProfile(loan.loan_id)} disabled={loading} size="small">Profile</Button>
+                      <Button 
+                        onClick={() => handleOpenProfile(loan.loan_id)} 
+                        disabled={loading} 
+                        size="small"
+                        sx={{ mr: 1 }}
+                      >
+                        Profile
+                      </Button>
+                      <Button 
+                        onClick={() => handleExportLoan(loan.loan_id)}
+                        disabled={exportLoading}
+                        size="small"
+                        startIcon={<GetAppIcon />}
+                        sx={{ 
+                          bgcolor: 'success.main', 
+                          color: 'white',
+                          '&:hover': { bgcolor: 'success.dark' },
+                          '&:disabled': { bgcolor: 'grey.400' }
+                        }}
+                      >
+                        {exportLoading ? 'Exporting...' : 'Export'}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -429,4 +497,4 @@ export default function Loans() {
       </Box>
     </Box>
   );
-} 
+}

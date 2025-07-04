@@ -13,6 +13,7 @@ import PaymentSchedules from './pages/PaymentSchedules';
 import { AppBar, Toolbar, Typography, Box, IconButton } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import { useState } from 'react';
+import Signup from './pages/Signup';
 
 function PrivateRoute({ children }) {
   return localStorage.getItem('token') ? children : <Navigate to="/login" />;
@@ -51,6 +52,7 @@ function AppContent() {
         <Box sx={{ p: { xs: 1, sm: 3 } }}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
             <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
             <Route path="/societies" element={<PrivateRoute><Societies /></PrivateRoute>} />
             <Route path="/members" element={<PrivateRoute><Members /></PrivateRoute>} />

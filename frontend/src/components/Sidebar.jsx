@@ -8,6 +8,13 @@ import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import PaymentIcon from '@mui/icons-material/Payment';
 import ReportIcon from '@mui/icons-material/Report';
 import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
+import PeopleIcon from '@mui/icons-material/People';
+import { Link } from 'react-router-dom';
+import GetAppIcon from '@mui/icons-material/GetApp';
+import { useState } from 'react';
+import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Button } from '@mui/material';
+
 
 const drawerWidth = 240;
 
@@ -26,6 +33,8 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const role = getOfficerRole();
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
 
   const menu = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
@@ -35,16 +44,60 @@ export default function Sidebar() {
     { text: 'Products', icon: <MonetizationOnIcon />, path: '/products' },
     { text: 'Payments', icon: <PaymentIcon />, path: '/payments' },
     { text: 'Reports', icon: <ReportIcon />, path: '/reports' },
+    { 
+      text: 'Officers', 
+      icon: role === 'admin' ? <SupervisorAccountIcon /> : <PeopleIcon />, 
+      path: '/officers' 
+    },
+    { text: 'Export Loans', icon: <GetAppIcon />, action: 'exportLoans' }
   ];
-
-  // Only admin can see officer management
-  if (role === 'admin') {
-    menu.push({ text: 'Officers', icon: <SupervisorAccountIcon />, path: '/officers' });
-  }
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     navigate('/login');
+  };
+
+  const handleExportLoans = () => {
+    setExportDialogOpen(true);
+  };
+
+  const handleDownload = async (format) => {
+    setExportLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      let url = '/api/loans/export';
+      let filename = 'all_loans_export.xlsx';
+      let contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+      if (format === 'pdf') {
+        url = '/api/loans/export/pdf';
+        filename = 'all_loans_export.pdf';
+        contentType = 'application/pdf';
+      }
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to export');
+      const blob = await res.blob();
+      // Try to get filename from header
+      const disposition = res.headers.get('Content-Disposition');
+      if (disposition && disposition.includes('filename=')) {
+        filename = disposition.split('filename=')[1].replace(/"/g, '');
+      }
+      const urlBlob = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = urlBlob;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(urlBlob);
+    } catch (err) {
+      alert('Export failed');
+    }
+    setExportLoading(false);
+    setExportDialogOpen(false);
   };
 
   return (
@@ -70,15 +123,17 @@ export default function Sidebar() {
         <List>
           {menu.map(item => (
             <ListItem
-              component="button"
+              component={item.path ? Link : 'button'}
+              button
               key={item.text}
-              selected={location.pathname === item.path}
-              onClick={() => navigate(item.path)}
+              to={item.path}
+              selected={item.path && location.pathname === item.path}
+              onClick={item.action === 'exportLoans' ? handleExportLoans : undefined}
               sx={{
                 borderRadius: 2,
                 mb: 0.5,
-                bgcolor: location.pathname === item.path ? 'primary.light' : 'inherit',
-                color: location.pathname === item.path ? 'primary.main' : 'text.primary',
+                bgcolor: item.path && location.pathname === item.path ? 'primary.light' : 'inherit',
+                color: item.path && location.pathname === item.path ? 'primary.main' : 'text.primary',
                 '&:hover': {
                   bgcolor: 'primary.lighter',
                   color: 'primary.main',
@@ -101,6 +156,23 @@ export default function Sidebar() {
           </Typography>
         </Box>
       </Box>
+      <Dialog open={exportDialogOpen} onClose={() => setExportDialogOpen(false)}>
+        <DialogTitle>Export Loans</DialogTitle>
+        <DialogContent>
+          <Typography>Choose the format to export all loans:</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => handleDownload('excel')} disabled={exportLoading}>
+            Excel
+          </Button>
+          {/* <Button onClick={() => handleDownload('pdf')} disabled={exportLoading}>
+            PDF
+          </Button> */}
+          <Button onClick={() => setExportDialogOpen(false)} disabled={exportLoading}>
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Drawer>
   );
-} 
+}

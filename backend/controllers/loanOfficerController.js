@@ -28,17 +28,26 @@ exports.create = async (req, res) => {
     if (!req.body.employee_id) {
       req.body.employee_id = await IDGenerator.generateEmployeeId();
     }
-    
+
     // Set default values
     req.body.status = req.body.status || 'ACTIVE';
     req.body.hire_date = req.body.hire_date || new Date();
     req.body.society_id = req.body.society_id || 1; // Default to first society
-    
+
+    // Ensure password is provided
+    if (!req.body.password) {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+
+    // Hash the password before saving
+    const bcrypt = require('bcrypt');
+    req.body.password = await bcrypt.hash(req.body.password, 10);
+
     const officer = await LoanOfficer.create(req.body, { user: req.officer });
     res.status(201).json(officer);
   } catch (err) {
     if (err.name === 'SequelizeUniqueConstraintError') {
-      res.status(400).json({ error: 'Employee ID already exists' });
+      res.status(400).json({ error: 'Employee ID or Email already exists' });
     } else {
       res.status(400).json({ error: err.message });
     }
@@ -49,11 +58,21 @@ exports.update = async (req, res) => {
   try {
     const officer = await LoanOfficer.findByPk(req.params.id);
     if (!officer) return res.status(404).json({ error: 'Officer not found' });
+
+    // If password is provided, hash it before updating
+    if (req.body.password) {
+      const bcrypt = require('bcrypt');
+      req.body.password = await bcrypt.hash(req.body.password, 10);
+    } else {
+      // Prevent overwriting password with undefined
+      delete req.body.password;
+    }
+
     await officer.update(req.body, { user: req.officer });
     res.json(officer);
   } catch (err) {
     if (err.name === 'SequelizeUniqueConstraintError') {
-      res.status(400).json({ error: 'Employee ID already exists' });
+      res.status(400).json({ error: 'Employee ID or Email already exists' });
     } else {
       res.status(400).json({ error: err.message });
     }
@@ -73,4 +92,13 @@ exports.delete = async (req, res) => {
       res.status(500).json({ error: err.message });
     }
   }
-}; 
+
+  exports.list = async (req, res) => {
+  try {
+    const officers = await LoanOfficer.findAll();
+    res.json(officers);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+};

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, TextField, Paper, Typography, Box } from '@mui/material';
 import api from '../api/axios';
 import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 export default function Login() {
   const [identifier, setIdentifier] = useState(''); // employee_id or email
@@ -42,6 +43,9 @@ export default function Login() {
           />
           {error && <Typography color="error">{error}</Typography>}
           <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }}>Login</Button>
+          <Box mt={2} textAlign="center">
+            <Link to="/signup">Don't have an account? Sign up</Link>
+          </Box>
         </form>
       </Paper>
     </Box>

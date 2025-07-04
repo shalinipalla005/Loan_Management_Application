@@ -1,11 +1,8 @@
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
-import { 
-  Table, TableHead, TableRow, TableCell, TableBody, Button, TextField, 
-  Dialog, DialogTitle, DialogContent, DialogActions, Typography, 
-  Paper, Box, Alert, Snackbar 
-} from '@mui/material';
+import { Paper, Typography, Box, Alert, Table, TableHead, TableRow, TableCell, TableBody, TableContainer, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem } from '@mui/material';
 
+// Helper to get role from token
 function getOfficerRole() {
   try {
     const token = localStorage.getItem('token');
@@ -19,223 +16,172 @@ function getOfficerRole() {
 
 export default function Officers() {
   const [officers, setOfficers] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ 
-    officer_name: '', 
-    contact_number: '', 
-    email: '', 
-    designation: '' 
-  });
-  const [editId, setEditId] = useState(null);
+  const [societies, setSocieties] = useState([]); // <-- Add societies state
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false); // For Add Officer dialog
   const role = getOfficerRole();
-  const isAdmin = role === 'admin';
 
-  const fetchOfficers = async () => {
+  useEffect(() => {
+    async function fetchOfficers() {
+      try {
+        const { data } = await api.get('/loan-officers');
+        setOfficers(data);
+      } catch {
+        setError('Failed to fetch officers');
+      }
+    }
+    fetchOfficers();
+  }, []);
+
+  // Fetch societies for admin
+  useEffect(() => {
+    if (role === 'admin') {
+      api.get('/societies')
+        .then(res => setSocieties(res.data))
+        .catch(() => setSocieties([]));
+    }
+  }, [role]);
+
+  // Add Officer dialog logic (only for admin)
+  const [form, setForm] = useState({
+    officer_name: '',
+    email: '',
+    password: '',
+    contact_number: '',
+    designation: '',
+    society_id: '',
+  });
+  const [addError, setAddError] = useState('');
+  const [addLoading, setAddLoading] = useState(false);
+
+  const handleAddOfficer = async () => {
+    setAddError('');
+    setAddLoading(true);
     try {
-      setLoading(true);
+      await api.post('/loan-officers', form);
+      setOpen(false);
+      setForm({ officer_name: '', email: '', password: '', contact_number: '', designation: '', society_id: '' });
+      // Refresh officers list
       const { data } = await api.get('/loan-officers');
       setOfficers(data);
     } catch (err) {
-      setError('Failed to fetch officers');
-    } finally {
-      setLoading(false);
+      setAddError(err.response?.data?.error || 'Failed to add officer');
     }
-  };
-
-  useEffect(() => { fetchOfficers(); }, []);
-
-  const handleOpen = (officer = { 
-    officer_name: '', 
-    contact_number: '', 
-    email: '', 
-    designation: '' 
-  }) => {
-    setForm(officer);
-    setEditId(officer.officer_id || null);
-    setOpen(true);
-    setError('');
-  };
-
-  const handleClose = () => { 
-    setOpen(false); 
-    setForm({ 
-      officer_name: '', 
-      contact_number: '', 
-      email: '', 
-      designation: '' 
-    }); 
-    setEditId(null); 
-    setError(''); 
-  };
-
-  const handleSubmit = async () => {
-    try {
-      setLoading(true);
-      if (editId) {
-        await api.put(`/loan-officers/${editId}`, form);
-        setSuccess('Officer updated successfully');
-      } else {
-        await api.post('/loan-officers', form);
-        setSuccess('Officer created successfully');
-      }
-      handleClose();
-      fetchOfficers();
-    } catch (err) {
-      setError(err.response?.data?.error || 'Error saving officer');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    try {
-      setLoading(true);
-      await api.delete(`/loan-officers/${id}`);
-      setSuccess('Officer deleted successfully');
-      fetchOfficers();
-    } catch (err) {
-      setError(err.response?.data?.error || 'Error deleting officer');
-    } finally {
-      setLoading(false);
-    }
+    setAddLoading(false);
   };
 
   return (
     <Box sx={{ display: 'flex', bgcolor: 'background.default', minHeight: '100vh' }}>
       <Box sx={{ flexGrow: 1, width: '100%' }}>
-        <Paper sx={{ width: '100%', maxWidth: '100%', mx: 0, p: 3, bgcolor: 'background.default', boxShadow: 2 }}>
-          <Typography variant="h4" sx={{ mb: 3, fontWeight: 700, color: 'primary.main' }}>Officers</Typography>
-          <Box display="flex" justifyContent="flex-end" mb={2}>
-            <Button 
-              variant="contained" 
-              onClick={() => handleOpen()} 
-              disabled={loading || !isAdmin}
-              sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
-            >
-              Add Officer
-            </Button>
+        <Paper sx={{ width: '100%', maxWidth: 1100, mx: 'auto', mt: 6, p: 3, boxShadow: 2 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>All Officers</Typography>
+            {role === 'admin' && (
+              <Button variant="contained" onClick={() => setOpen(true)}>
+                Add Officer
+              </Button>
+            )}
           </Box>
-          {!isAdmin && (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              Only admins can add, edit, or delete officers. You have view-only access.
-            </Alert>
-          )}
-          {loading && <Typography>Loading...</Typography>}
-          
-          <Table>
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'primary.light' }}>
-                <TableCell>Name</TableCell>
-                <TableCell>Employee ID</TableCell>
-                <TableCell>Contact</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Designation</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {officers.map(officer => (
-                <TableRow key={officer.officer_id}>
-                  <TableCell>{officer.officer_name}</TableCell>
-                  <TableCell>{officer.employee_id}</TableCell>
-                  <TableCell>{officer.contact_number || '-'}</TableCell>
-                  <TableCell>{officer.email || '-'}</TableCell>
-                  <TableCell>{officer.designation}</TableCell>
-                  <TableCell>{officer.status}</TableCell>
-                  <TableCell>
-                    <Button 
-                      onClick={() => handleOpen(officer)}
-                      disabled={loading || !isAdmin}
-                      size="small"
-                      sx={{ mr: 1 }}
-                    >
-                      Edit
-                    </Button>
-                    <Button 
-                      color="error" 
-                      onClick={() => handleDelete(officer.officer_id)}
-                      disabled={loading || !isAdmin}
-                      size="small"
-                    >
-                      Delete
-                    </Button>
-                  </TableCell>
+          {error && <Alert severity="error">{error}</Alert>}
+          <TableContainer sx={{ maxHeight: 500, overflow: 'auto' }}>
+            <Table stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Employee ID</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Contact</TableCell>
+                  <TableCell>Designation</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Role</TableCell>
+                  <TableCell>Society ID</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+              <TableBody>
+                {officers.map(officer => (
+                  <TableRow key={officer.officer_id}>
+                    <TableCell>{officer.officer_name}</TableCell>
+                    <TableCell>{officer.employee_id}</TableCell>
+                    <TableCell>{officer.email}</TableCell>
+                    <TableCell>{officer.contact_number || '-'}</TableCell>
+                    <TableCell>{officer.designation || '-'}</TableCell>
+                    <TableCell>{officer.status}</TableCell>
+                    <TableCell>{officer.role}</TableCell>
+                    <TableCell>{officer.society_id}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
 
-          <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-            <DialogTitle>{editId ? 'Edit Officer' : 'Add Officer'}</DialogTitle>
+          {/* Add Officer Dialog (admin only) */}
+          <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>Add Officer</DialogTitle>
             <DialogContent>
               <TextField
-                label="Officer Name *"
+                label="Name"
                 value={form.officer_name}
                 onChange={e => setForm(f => ({ ...f, officer_name: e.target.value }))}
                 fullWidth margin="normal" required
-                disabled={!isAdmin}
+              />
+              <TextField
+                label="Email"
+                value={form.email}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                fullWidth margin="normal" required
+              />
+              <TextField
+                label="Password"
+                type="password"
+                value={form.password}
+                onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                fullWidth margin="normal" required
               />
               <TextField
                 label="Contact Number"
                 value={form.contact_number}
                 onChange={e => setForm(f => ({ ...f, contact_number: e.target.value }))}
                 fullWidth margin="normal"
-                disabled={!isAdmin}
-              />
-              <TextField
-                label="Email"
-                value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                fullWidth margin="normal" type="email"
-                disabled={!isAdmin}
               />
               <TextField
                 label="Designation"
                 value={form.designation}
                 onChange={e => setForm(f => ({ ...f, designation: e.target.value }))}
                 fullWidth margin="normal"
-                disabled={!isAdmin}
               />
-              {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+              {role === 'admin' ? (
+                <TextField
+                  select
+                  label="Society"
+                  value={form.society_id}
+                  onChange={e => setForm(f => ({ ...f, society_id: e.target.value }))}
+                  fullWidth margin="normal" required
+                >
+                  {societies.map(soc => (
+                    <MenuItem key={soc.society_id} value={soc.society_id}>
+                      {soc.society_name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              ) : (
+                <TextField
+                  label="Society ID"
+                  value={form.society_id}
+                  onChange={e => setForm(f => ({ ...f, society_id: e.target.value }))}
+                  fullWidth margin="normal"
+                />
+              )}
+              {addError && <Alert severity="error" sx={{ mt: 2 }}>{addError}</Alert>}
             </DialogContent>
             <DialogActions>
-              <Button onClick={handleClose} disabled={loading}>Cancel</Button>
-              <Button 
-                onClick={handleSubmit} 
-                variant="contained" 
-                disabled={loading || !form.officer_name || !isAdmin}
-                sx={{ bgcolor: '#8A784E', '&:hover': { bgcolor: '#3B3B1A' } }}
-              >
-                {loading ? 'Saving...' : 'Save'}
+              <Button onClick={() => setOpen(false)} disabled={addLoading}>Cancel</Button>
+              <Button onClick={handleAddOfficer} variant="contained" disabled={addLoading}>
+                {addLoading ? 'Saving...' : 'Save'}
               </Button>
             </DialogActions>
           </Dialog>
-
-          <Snackbar 
-            open={!!success} 
-            autoHideDuration={6000} 
-            onClose={() => setSuccess('')}
-          >
-            <Alert severity="success" onClose={() => setSuccess('')}>
-              {success}
-            </Alert>
-          </Snackbar>
-
-          <Snackbar 
-            open={!!error} 
-            autoHideDuration={6000} 
-            onClose={() => setError('')}
-          >
-            <Alert severity="error" onClose={() => setError('')}>
-              {error}
-            </Alert>
-          </Snackbar>
         </Paper>
       </Box>
     </Box>
   );
-} 
+}
