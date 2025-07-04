@@ -1,12 +1,12 @@
 const express = require('express');
 const cors = require('cors');
 const { sequelize } = require('./models');
-<<<<<<< HEAD
+
 const outstandingInterestRoutes = require('./routes/outstandingInterestRoutes');
-=======
+
 const { LoanOfficer } = require('./models');
 const bcrypt = require('bcrypt');
->>>>>>> audit-backend
+
 
 const app = express();
 
@@ -212,10 +212,10 @@ app.use('/api/members', require('./routes/memberRoutes'));
 app.use('/api', exportRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api/loanprofiles', loanProfileRoutes);
-<<<<<<< HEAD
+
 app.use('/api/loans', outstandingInterestRoutes);
 // Add more routes here as they are created
-=======
+
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/societies', require('./routes/societyRoutes'));
 app.use('/api/loan-officers', require('./routes/loanOfficerRoutes'));
@@ -228,7 +228,7 @@ app.use('/api/loan-status-history', require('./routes/loanStatusHistoryRoutes'))
 app.use('/api/member-documents', require('./routes/memberDocumentRoutes'));
 app.use('/api/audit-log', require('./routes/auditLogRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
->>>>>>> audit-backend
+
 
 // app.post('/api/loans/test-create', async (req, res) => {
 //   try {

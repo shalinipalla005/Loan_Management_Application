@@ -10,7 +10,7 @@ export default function Signup() {
     password: '',
     contact_number: '',
     designation: '',
-    society_id: '', // If you want to let officer select society, otherwise remove
+    society_id: '',
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -27,6 +27,10 @@ export default function Signup() {
     } catch (err) {
       setError(err.response?.data?.error || 'Signup failed');
     }
+  };
+
+  const handleGoToLogin = () => {
+    navigate('/login');
   };
 
   return (
@@ -70,6 +74,15 @@ export default function Signup() {
           {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
           {success && <Alert severity="success" sx={{ mt: 2 }}>{success}</Alert>}
           <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }}>Sign Up</Button>
+          <Button
+            variant="text"
+            color="primary"
+            fullWidth
+            sx={{ mt: 1 }}
+            onClick={handleGoToLogin}
+          >
+            Back to Login
+          </Button>
         </form>
       </Paper>
     </Box>
