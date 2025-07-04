@@ -18,4 +18,30 @@ module.exports = {
   logging: {
     level: process.env.LOG_LEVEL || 'debug',
   },
+
+  // Sequelize CLI configuration
+  development: {
+    username: null,
+    password: null,
+    database: './models/loan_management.db',
+    host: null,
+    dialect: 'sqlite',
+    storage: './models/loan_management.db'
+  },
+  test: {
+    username: null,
+    password: null,
+    database: './models/loan_management_test.db',
+    host: null,
+    dialect: 'sqlite',
+    storage: './models/loan_management_test.db'
+  },
+  production: {
+    username: null,
+    password: null,
+    database: './models/loan_management.db',
+    host: null,
+    dialect: 'sqlite',
+    storage: './models/loan_management.db'
+  }
 };

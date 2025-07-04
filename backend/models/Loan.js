@@ -21,6 +21,8 @@ const Loan = sequelize.define('Loan', {
   outstanding_principal: { type: DataTypes.DECIMAL(12,2) },
   outstanding_interest: { type: DataTypes.DECIMAL(12,2) },
   loan_status: { type: DataTypes.STRING, defaultValue: 'PENDING' },
+  cleared_by_official: { type: DataTypes.BOOLEAN, defaultValue: false },
+  cleared_at: { type: DataTypes.DATE },
   created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   updated_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
 }, {

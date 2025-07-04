@@ -1,5 +1,10 @@
 const Loan = require('../models/Loan');
 const Member = require('../models/Member');
+const RepaymentSchedule = require('../models/RepaymentSchedule');
+const { generateLoanSchedule } = require('../utils/helpers');
+const Payment = require('../models/Payment');
+const Penalty = require('../models/Penalty');
+const MemberSavings = require('../models/MemberSavings');
 
 // GET /api/loans - List all loan profiles with member details
 exports.getAllLoans = async (req, res) => {
@@ -103,7 +108,13 @@ exports.getMemberWithLoans = async (req, res) => {
         as: 'loans',
         where: loanWhereClause,
         required: false,
-        order: [['created_at', 'DESC']]
+        order: [['created_at', 'DESC']],
+        include: [
+          require('../models/RepaymentSchedule'),
+          require('../models/Payment'),
+          require('../models/Penalty'),
+          require('../models/MemberSavings')
+        ]
       }]
     });
 
@@ -197,6 +208,32 @@ exports.createLoan = async (req, res) => {
       loan_status: 'PENDING'
     });
 
+    // Generate and insert repayment schedule
+    const schedule = generateLoanSchedule({
+      loan_amount,
+      interest_rate,
+      tenure_months,
+      monthly_savings: monthly_savings || 200.00,
+      first_due_date,
+      disbursement_date
+    });
+    const scheduleRows = schedule.map((item, idx) => ({
+      loan_id: newLoan.loan_id,
+      installment_number: idx + 1,
+      due_date: item['Due Date'],
+      opening_balance: (parseFloat(loan_amount) - (parseFloat(item['Principal']) * idx)).toFixed(2),
+      principal_amount: item['Principal'],
+      interest_amount: item['Interest'],
+      monthly_savings: item['Savings'],
+      total_installment: item['Total Amount'],
+      closing_balance: item['Remaining Principal'],
+      payment_status: item['Status'],
+      paid_date: null,
+      paid_amount: 0.00,
+      penalty_applied: 0.00
+    }));
+    await RepaymentSchedule.bulkCreate(scheduleRows);
+
     // Fetch the created loan with member details
     const loanWithMember = await Loan.findByPk(newLoan.loan_id, {
       include: [{
@@ -227,11 +264,17 @@ exports.getLoanById = async (req, res) => {
     const { loanId } = req.params;
 
     const loan = await Loan.findByPk(loanId, {
-      include: [{
-        model: Member,
-        as: 'member',
-        attributes: ['member_id', 'member_name', 'membership_number', 'contact_number', 'email', 'address']
-      }]
+      include: [
+        {
+          model: Member,
+          as: 'member',
+          attributes: ['member_id', 'member_name', 'membership_number', 'contact_number', 'email', 'address']
+        },
+        require('../models/RepaymentSchedule'),
+        Payment,
+        Penalty,
+        MemberSavings
+      ]
     });
 
     if (!loan) {
