@@ -9,6 +9,7 @@ const Society = sequelize.define('Society', {
   contact_number: { type: DataTypes.STRING },
   email: { type: DataTypes.STRING },
   established_date: { type: DataTypes.DATE },
+
   status: { 
     type: DataTypes.STRING, 
     defaultValue: 'ACTIVE',
@@ -16,6 +17,9 @@ const Society = sequelize.define('Society', {
       isIn: [['ACTIVE', 'INACTIVE']]
     }
   },
+
+  status: { type: DataTypes.ENUM('ACTIVE', 'INACTIVE'), defaultValue: 'ACTIVE' },
+
   created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   updated_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
 }, {
@@ -23,4 +27,8 @@ const Society = sequelize.define('Society', {
   timestamps: false,
 });
 
+
 module.exports = Society;
+
+module.exports = Society;
+

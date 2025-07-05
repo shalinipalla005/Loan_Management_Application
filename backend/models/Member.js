@@ -16,6 +16,7 @@ const Member = sequelize.define('Member', {
   membership_fee: { type: DataTypes.DECIMAL(10,2), defaultValue: 50.00 },
   share_capital: { type: DataTypes.DECIMAL(10,2), defaultValue: 1000.00 },
   status: { type: DataTypes.STRING, defaultValue: 'ACTIVE' },
+  password: { type: DataTypes.STRING, allowNull: true },
   created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   updated_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
 }, {

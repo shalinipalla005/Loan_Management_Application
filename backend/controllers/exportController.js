@@ -6,6 +6,7 @@ const path = require('path');
 const { generateLoanSchedule } = require('../utils/helpers');
 
 class ExportController {
+  // GET /api/loans/export - Export all loans
   static async exportAllLoans(req, res) {
     try {
       const loans = await Loan.findAll({
@@ -61,6 +62,7 @@ class ExportController {
       const workbook = XLSX.utils.book_new();
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       
+      // Set column widths
       const colWidths = Object.keys(exportData[0] || {}).map(key => ({
         wch: Math.max(key.length, 15)
       }));
@@ -68,11 +70,14 @@ class ExportController {
 
       XLSX.utils.book_append_sheet(workbook, worksheet, 'All Loans');
 
+      // Generate filename with timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
       const filename = `all_loans_export_${timestamp}.xlsx`;
-
+      
+      // Create buffer
       const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
+      // Set headers and send file
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.send(buffer);
@@ -87,7 +92,7 @@ class ExportController {
     }
   }
 
-  // GET /api/loans/:loanId/export 
+  // GET /api/loans/:loanId/export - Export specific loan
   static async exportSpecificLoan(req, res) {
     try {
       const { loanId } = req.params;
@@ -124,6 +129,7 @@ class ExportController {
       // Generate loan schedule
       const schedule = generateLoanSchedule(loan);
 
+      // Prepare loan profile data
       const loanProfileData = [{
         'Field': 'Loan ID',
         'Value': loan.loan_id
@@ -184,6 +190,18 @@ class ExportController {
       }, {
         'Field': 'Loan Status',
         'Value': loan.loan_status || ''
+      }, {
+        'Field': 'Disbursement Date',
+        'Value': loan.disbursement_date ? new Date(loan.disbursement_date).toISOString().split('T')[0] : ''
+      }, {
+        'Field': 'First Due Date',
+        'Value': loan.first_due_date ? new Date(loan.first_due_date).toISOString().split('T')[0] : ''
+      }, {
+        'Field': 'Last Due Date',
+        'Value': loan.last_due_date ? new Date(loan.last_due_date).toISOString().split('T')[0] : ''
+      }, {
+        'Field': 'Created At',
+        'Value': loan.created_at ? new Date(loan.created_at).toISOString().split('T')[0] : ''
       }];
 
       // Create Excel workbook
@@ -194,13 +212,15 @@ class ExportController {
       profileSheet['!cols'] = [{ wch: 25 }, { wch: 30 }];
       XLSX.utils.book_append_sheet(workbook, profileSheet, 'Loan Profile');
       
-      // Add schedule sheet
-      const scheduleSheet = XLSX.utils.json_to_sheet(schedule);
-      scheduleSheet['!cols'] = [
-        { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, 
-        { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 15 }
-      ];
-      XLSX.utils.book_append_sheet(workbook, scheduleSheet, 'Payment Schedule');
+      // Add schedule sheet if available
+      if (schedule && schedule.length > 0) {
+        const scheduleSheet = XLSX.utils.json_to_sheet(schedule);
+        scheduleSheet['!cols'] = [
+          { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, 
+          { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 15 }
+        ];
+        XLSX.utils.book_append_sheet(workbook, scheduleSheet, 'Payment Schedule');
+      }
 
       const filename = `loan_${loan.loan_number}_export.xlsx`;
       const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
@@ -219,7 +239,7 @@ class ExportController {
     }
   }
 
-  // POST /api/loans/import 
+  // POST /api/loans/import - Import backup data
   static async importBackupData(req, res) {
     const transaction = await sequelize.transaction();
     
@@ -295,6 +315,7 @@ class ExportController {
         }
       }
 
+      // Clean up uploaded file
       fs.unlinkSync(req.file.path);
 
       await transaction.commit();
@@ -306,7 +327,7 @@ class ExportController {
           total_rows: importData.length,
           successful_imports: successCount,
           failed_imports: errorCount,
-          errors: errors.slice(0, 10) 
+          errors: errors.slice(0, 10) // Show first 10 errors
         }
       });
 
@@ -329,6 +350,6 @@ class ExportController {
 
 module.exports = {
   exportAllLoans: ExportController.exportAllLoans,
-  importBackupData: ExportController.importBackupData,
   exportSpecificLoan: ExportController.exportSpecificLoan,
+  importBackupData: ExportController.importBackupData,
 };
