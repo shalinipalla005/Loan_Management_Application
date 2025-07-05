@@ -7,6 +7,15 @@ import {
 } from '@mui/material';
 import GetAppIcon from '@mui/icons-material/GetApp';
 
+function ProfileField({ label, value }) {
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', p: 1 }}>
+      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>{label}</Typography>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>{value ?? '-'}</Typography>
+    </Box>
+  );
+}
+
 export default function Loans() {
   const [loans, setLoans] = useState([]);
   const [members, setMembers] = useState([]);
@@ -372,10 +381,44 @@ export default function Loans() {
             <DialogContent>
               {profileLoading || !profileLoan ? <Typography>Loading...</Typography> : (
                 <Box>
-                  <Typography variant="h6">Loan Number: {profileLoan.loan_number}</Typography>
-                  <Typography>Member: {profileLoan.member?.member_name}</Typography>
-                  <Typography>Amount: ₹{profileLoan.loan_amount}</Typography>
-                  <Typography>Status: {profileLoan.loan_status}</Typography>
+                  {/* Loan Profile Card/Grid */}
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                      gap: 2,
+                      mb: 4,
+                      p: 2,
+                      bgcolor: '#f7fbff',
+                      borderRadius: 2,
+                      boxShadow: 1
+                    }}
+                  >
+                    <ProfileField label="Loan ID" value={profileLoan.loan_id} />
+                    <ProfileField label="Loan Number" value={profileLoan.loan_number} />
+                    <ProfileField label="Member Name" value={profileLoan.member?.member_name} />
+                    <ProfileField label="Membership Number" value={profileLoan.member?.membership_number} />
+                    <ProfileField label="Contact Number" value={profileLoan.member?.contact_number} />
+                    <ProfileField label="Email" value={profileLoan.member?.email} />
+                    <ProfileField label="Address" value={profileLoan.member?.address} />
+                    <ProfileField label="Society" value={profileLoan.member?.Society?.society_name || profileLoan.society?.society_name} />
+                    <ProfileField label="Loan Officer" value={profileLoan.officer?.officer_name || profileLoan.loan_officer?.officer_name} />
+                    <ProfileField label="Product Name" value={profileLoan.product?.product_name || profileLoan.loan_product?.product_name} />
+                    <ProfileField label="Loan Amount" value={profileLoan.loan_amount} />
+                    <ProfileField label="Interest Rate (%)" value={profileLoan.interest_rate} />
+                    <ProfileField label="Tenure (Months)" value={profileLoan.tenure_months} />
+                    <ProfileField label="Processing Fee" value={profileLoan.processing_fee} />
+                    <ProfileField label="Monthly Savings" value={profileLoan.monthly_savings} />
+                    <ProfileField label="Total Interest" value={profileLoan.total_interest} />
+                    <ProfileField label="Total Payable" value={profileLoan.total_payable} />
+                    <ProfileField label="Outstanding Principal" value={profileLoan.outstanding_principal} />
+                    <ProfileField label="Outstanding Interest" value={profileLoan.outstanding_interest} />
+                    <ProfileField label="Loan Status" value={profileLoan.loan_status} />
+                    <ProfileField label="Disbursement Date" value={profileLoan.disbursement_date?.slice(0,10)} />
+                    <ProfileField label="First Due Date" value={profileLoan.first_due_date?.slice(0,10)} />
+                    <ProfileField label="Last Due Date" value={profileLoan.last_due_date?.slice(0,10)} />
+                    <ProfileField label="Created At" value={profileLoan.created_at?.slice(0,10)} />
+                  </Box>
                   <Typography sx={{ mt: 2, fontWeight: 700 }}>Repayment Schedule</Typography>
                   <Table size="small">
                     <TableHead>

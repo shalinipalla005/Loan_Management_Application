@@ -4,22 +4,12 @@ import { Tabs, Tab, Box, Typography, Table, TableHead, TableRow, TableCell, Tabl
 
 function DataTable({ columns, rows }) {
   return (
-    <Box sx={{ width: '100%', overflowX: 'auto' }}>
-      <Table size="small" sx={{ minWidth: 400, tableLayout: 'fixed', width: '100%' }}>
+    <div className="reports-table-container">
+      <Table className="reports-table" size="small" sx={{ minWidth: 900, tableLayout: 'auto', width: '100%' }}>
         <TableHead>
-          <TableRow sx={{ bgcolor: 'primary.light' }}>
+          <TableRow>
             {columns.map(col => (
-              <TableCell
-                key={col}
-                sx={{
-                  fontSize: { xs: '0.75rem', sm: '0.9rem' },
-                  padding: { xs: '4px 6px', sm: '6px 10px' },
-                  maxWidth: 100,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}
-              >
+              <TableCell key={col} component="th" sx={{ minWidth: 120, whiteSpace: 'nowrap', fontSize: '1rem', padding: '12px 10px' }}>
                 {col}
               </TableCell>
             ))}
@@ -28,28 +18,24 @@ function DataTable({ columns, rows }) {
         <TableBody>
           {rows.map((row, i) => (
             <TableRow key={i}>
-              {columns.map(col => (
-                <TableCell
-                  key={col}
-                  sx={{
-                    fontSize: { xs: '0.7rem', sm: '0.85rem' },
-                    padding: { xs: '4px 6px', sm: '6px 10px' },
-                    maxWidth: 100,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'normal'
-                  }}
-                >
-                  {String(row[col]).length > 20
-                    ? <span title={row[col]}>{String(row[col]).slice(0, 18)}…</span>
-                    : row[col]}
-                </TableCell>
-              ))}
+              {columns.map(col => {
+                const value = String(row[col] ?? '');
+                return (
+                  <TableCell
+                    key={col}
+                    className={value.length > 20 ? 'ellipsis-cell' : ''}
+                    data-fulltext={value.length > 20 ? value : undefined}
+                    sx={{ minWidth: 120, whiteSpace: 'nowrap', fontSize: '0.97rem', padding: '10px 8px' }}
+                  >
+                    {value.length > 20 ? value.slice(0, 18) + '\u2026' : value}
+                  </TableCell>
+                );
+              })}
             </TableRow>
           ))}
         </TableBody>
       </Table>
-    </Box>
+    </div>
   );
 }
 
@@ -103,7 +89,8 @@ export default function Reports() {
           <Tabs
             value={tab}
             onChange={(_, v) => setTab(v)}
-            sx={{ bgcolor: 'primary.light', borderRadius: 2 }}
+            className="reports-tabs"
+            sx={{ bgcolor: 'primary.light', borderRadius: 2, mb: 3 }}
             variant="scrollable"
             scrollButtons="auto"
           >
