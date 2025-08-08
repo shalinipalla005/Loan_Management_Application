@@ -1,0 +1,37 @@
+{
+  "name": "loan-management-desktop",
+  "version": "1.0.0",
+  "description": "Loan Management Desktop Application",
+  "main": "electron/main.js",
+  "author": "Your Company",
+  "license": "MIT",
+  "scripts": {
+    "postinstall": "cd frontend && npm install && cd ../backend && npm install && cd ../electron && npm install",
+    "predev": "cd frontend && npm run build",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:electron\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:electron": "NODE_ENV=development npx electron electron/main.js",
+    "build": "node scripts/build-all.js",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build || echo 'No backend build script'",
+    "migrate-db": "node scripts/migrate-db.js",
+    "package": "npm run build && electron-builder",
+    "package:mac": "npm run build && electron-builder --mac",
+    "package:win": "npm run build && electron-builder --win",
+    "dist": "npm run build && electron-builder --publish=never"
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.0",
+    "cross-env": "^7.0.0",
+    "electron": "^27.0.0",
+    "electron-builder": "^24.0.0",
+    "png-to-ico": "^2.1.8",
+    "sequelize-cli": "^6.6.3",
+    "sharp": "^0.34.3",
+    "wait-on": "^7.0.0"
+  },
+  "dependencies": {
+    "electron-window-state": "^5.0.0"
+  }
+}

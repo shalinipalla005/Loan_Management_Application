@@ -1,0 +1,11 @@
+{
+  "name": "loan-management-electron",
+  "version": "1.0.0",
+  "description": "Electron wrapper for Loan Management Application",
+  "main": "main.js",
+  "dependencies": {
+    "sqlite3": "^5.1.7",
+    "electron-updater": "^6.0.0",
+    "electron-window-state": "^5.0.0"
+  }
+} 
