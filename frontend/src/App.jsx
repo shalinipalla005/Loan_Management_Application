@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Login from './pages/Login';
 import Societies from './pages/Societies';
@@ -71,9 +71,11 @@ function AppContent() {
 }
 
 export default function App() {
+  const isFile = typeof window !== 'undefined' && window.location && window.location.protocol === 'file:';
+  const RouterImpl = isFile ? HashRouter : Router;
   return (
-    <Router>
+    <RouterImpl>
       <AppContent />
-    </Router>
+    </RouterImpl>
   );
 }

@@ -65,12 +65,13 @@ export default function Sidebar() {
     setExportLoading(true);
     try {
       const token = localStorage.getItem('token');
-      let url = '/api/loans/export';
+      const baseURL = (window.electron && window.electron.env && window.electron.env.backendURL) || '';
+      let url = `${baseURL}/loans/export`;
       let filename = 'all_loans_export.xlsx';
       let contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
       if (format === 'pdf') {
-        url = '/api/loans/export/pdf';
+        url = `${baseURL}/loans/export/pdf`;
         filename = 'all_loans_export.pdf';
         contentType = 'application/pdf';
       }

@@ -11,7 +11,16 @@ const bcrypt = require('bcrypt');
 const app = express();
 
 // Middleware
-app.use(cors());
+// CORS: allow Electron renderer (file:// origin shows as "null") and expose download headers
+const corsOptions = {
+  origin: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type'],
+  exposedHeaders: ['Content-Disposition'],
+  credentials: false,
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
 const exportRoutes = require('./routes/exportRoutes');
@@ -35,6 +44,11 @@ async function initializeDatabase() {
     // Test database connection
     await sequelize.authenticate();
     console.log('Database connection established.');
+    // Ensure tables exist when running outside migration environment
+    if (typeof sequelize.sync === 'function') {
+      await sequelize.sync();
+      console.log('Database schema synchronized (sync).');
+    }
     
     // Note: Database schema is now managed through migrations
     // Run migrations with: npx sequelize-cli db:migrate
