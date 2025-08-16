@@ -1,9 +1,11 @@
 const { LoanOfficer } = require('../models');
 const IDGenerator = require('../utils/idGenerator');
+const bcrypt = require('bcrypt');
 
 exports.list = async (req, res) => {
   try {
     const officers = await LoanOfficer.findAll({
+      where: { role: ['admin', 'officer', 'auditor'] },
       order: [['created_at', 'DESC']]
     });
     res.json(officers);
@@ -24,23 +26,16 @@ exports.get = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    // Auto-generate employee ID if not provided
     if (!req.body.employee_id) {
       req.body.employee_id = await IDGenerator.generateEmployeeId();
     }
-
-    // Set default values
     req.body.status = req.body.status || 'ACTIVE';
     req.body.hire_date = req.body.hire_date || new Date();
-    req.body.society_id = req.body.society_id || 1; // Default to first society
+    req.body.society_id = req.body.society_id || 1;
 
-    // Ensure password is provided
     if (!req.body.password) {
       return res.status(400).json({ error: 'Password is required' });
     }
-
-    // Hash the password before saving
-    const bcrypt = require('bcrypt');
     req.body.password = await bcrypt.hash(req.body.password, 10);
 
     const officer = await LoanOfficer.create(req.body, { user: req.officer });
@@ -59,12 +54,9 @@ exports.update = async (req, res) => {
     const officer = await LoanOfficer.findByPk(req.params.id);
     if (!officer) return res.status(404).json({ error: 'Officer not found' });
 
-    // If password is provided, hash it before updating
     if (req.body.password) {
-      const bcrypt = require('bcrypt');
       req.body.password = await bcrypt.hash(req.body.password, 10);
     } else {
-      // Prevent overwriting password with undefined
       delete req.body.password;
     }
 
@@ -92,13 +84,4 @@ exports.delete = async (req, res) => {
       res.status(500).json({ error: err.message });
     }
   }
-
-  exports.list = async (req, res) => {
-  try {
-    const officers = await LoanOfficer.findAll();
-    res.json(officers);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
 };

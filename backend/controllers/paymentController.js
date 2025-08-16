@@ -1,4 +1,5 @@
 const { Payment, Loan, RepaymentSchedule } = require('../models');
+const { Op } = require('sequelize');
 const IDGenerator = require('../utils/idGenerator');
 
 exports.list = async (req, res) => {
@@ -45,16 +46,67 @@ exports.create = async (req, res) => {
 
     // --- Payment Allocation Logic ---
     const loan = await Loan.findByPk(req.body.loan_id);
-    if (!loan) throw new Error('Loan not found');
+    if (!loan) {
+      return res.status(404).json({ error: 'Loan not found' });
+    }
+
+    // Verify loan status
+    if (loan.status !== 'ACTIVE' && loan.status !== 'DISBURSED') {
+      return res.status(400).json({ 
+        error: `Cannot process payment. Loan status is ${loan.status}. Loan must be ACTIVE or DISBURSED.` 
+      });
+    }
+
+    console.log('Processing payment for loan:', {
+      loan_id: loan.loan_id,
+      status: loan.status,
+      amount: loan.loan_amount
+    });
+
     let remaining = parseFloat(req.body.payment_amount);
     let penaltyPaid = 0, interestPaid = 0, principalPaid = 0, savingsPaid = 0;
 
-    // Find the next due schedule
-    const schedule = await RepaymentSchedule.findOne({
-      where: { loan_id: loan.loan_id, payment_status: ['PENDING', 'OVERDUE', 'PARTIAL'] },
+    // Find any installment for this loan
+    const allSchedules = await RepaymentSchedule.findAll({
+      where: {
+        loan_id: loan.loan_id
+      },
       order: [['installment_number', 'ASC']]
     });
-    if (!schedule) throw new Error('No due schedule found');
+
+    console.log('Found schedules:', allSchedules.length, 'for loan:', loan.loan_id);
+
+    if (!allSchedules || allSchedules.length === 0) {
+      // Debug log the loan details
+      console.log('Loan details:', {
+        loan_id: loan.loan_id,
+        status: loan.status,
+        amount: loan.loan_amount
+      });
+      return res.status(400).json({ 
+        error: "No installments found for this loan. Please ensure repayment schedules are generated.",
+        loanId: loan.loan_id 
+      });
+    }
+
+    // Find the first unpaid or partially paid installment
+    const schedule = allSchedules.find(sch => {
+      const totalAmount = parseFloat(sch.total_installment);
+      const paidAmount = parseFloat(sch.paid_amount || 0);
+      return paidAmount < totalAmount;
+    });
+
+    if (!schedule) {
+      return res.status(400).json({ error: "All installments for this loan are fully paid." });
+    }
+
+    // Check if this installment is already fully paid
+    const totalInstallment = parseFloat(schedule.total_installment);
+    const alreadyPaid = parseFloat(schedule.paid_amount || 0);
+    
+    if (alreadyPaid >= totalInstallment) {
+      return res.status(400).json({ error: "This installment is already fully paid. Please proceed to the next installment." });
+    }
 
     // 1. Penalty
     if (schedule.penalty_applied > 0 && remaining > 0) {
@@ -79,12 +131,20 @@ exports.create = async (req, res) => {
 
     // Update schedule
     const totalPaid = penaltyPaid + interestPaid + principalPaid + savingsPaid;
-    let newStatus = 'PAID';
-    if (totalPaid < (parseFloat(schedule.total_installment) + parseFloat(schedule.penalty_applied))) {
+    const updatedPaidAmount = (parseFloat(schedule.paid_amount || 0) + totalPaid).toFixed(2);
+    const totalRequired = parseFloat(schedule.total_installment);
+    
+    let newStatus;
+    if (parseFloat(updatedPaidAmount) >= totalRequired) {
+      newStatus = 'PAID';
+    } else if (parseFloat(updatedPaidAmount) > 0) {
       newStatus = 'PARTIAL';
+    } else {
+      newStatus = 'PENDING';
     }
+
     await schedule.update({
-      paid_amount: (parseFloat(schedule.paid_amount) + totalPaid).toFixed(2),
+      paid_amount: updatedPaidAmount,
       paid_date: req.body.payment_date,
       payment_status: newStatus
     });
@@ -105,6 +165,7 @@ exports.create = async (req, res) => {
     });
 
     // Save payment record
+    req.body.schedule_id = schedule.schedule_id;
     req.body.principal_paid = principalPaid;
     req.body.interest_paid = interestPaid;
     req.body.savings_paid = savingsPaid;

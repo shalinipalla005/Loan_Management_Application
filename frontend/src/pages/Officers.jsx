@@ -117,6 +117,7 @@ export default function Officers() {
                   <TableCell>Status</TableCell>
                   <TableCell>Role</TableCell>
                   <TableCell>Society ID</TableCell>
+                  {role === 'admin' && <TableCell align="right">Actions</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -130,6 +131,20 @@ export default function Officers() {
                     <TableCell>{officer.status}</TableCell>
                     <TableCell>{officer.role}</TableCell>
                     <TableCell>{officer.society_id}</TableCell>
+                    {role === 'admin' && (
+                      <TableCell align="right">
+                        <Button color="error" size="small" onClick={async () => {
+                          try {
+                            await api.delete(`/loan-officers/${officer.officer_id}`);
+                            fetchOfficers();
+                          } catch (err) {
+                            alert(err.response?.data?.error || 'Failed to delete officer');
+                          }
+                        }}>
+                          Delete
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>

@@ -8,6 +8,10 @@ class DashboardController {
       
       const whereClause = {};
       if (society_id) whereClause.society_id = society_id;
+      // If a client (society user) is logged in, enforce filtering by their society
+      if (req.officer && req.officer.role === 'client' && req.officer.society_id) {
+        whereClause.society_id = req.officer.society_id;
+      }
       if (status) whereClause.loan_status = status;
 
       const loans = await Loan.findAll({

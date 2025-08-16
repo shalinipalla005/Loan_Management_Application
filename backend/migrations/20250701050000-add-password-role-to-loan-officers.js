@@ -14,7 +14,7 @@ module.exports = {
     // Check if 'role' column exists
     if (!table.role) {
       await queryInterface.addColumn('loan_officers', 'role', {
-        type: Sequelize.ENUM('admin', 'officer', 'auditor'),
+        type: Sequelize.ENUM('admin', 'officer', 'auditor', 'client'),
         allowNull: false,
         defaultValue: 'officer'
       });

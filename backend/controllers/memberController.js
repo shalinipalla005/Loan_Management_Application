@@ -4,7 +4,12 @@ const IDGenerator = require('../utils/idGenerator');
 // List all members
 async function listMembers(req, res) {
   try {
+    const where = {};
+    if (req.officer && req.officer.role === 'client' && req.officer.society_id) {
+      where.society_id = req.officer.society_id;
+    }
     const members = await Member.findAll({
+      where,
       order: [['created_at', 'DESC']]
     });
     res.json(members);
@@ -18,6 +23,9 @@ async function getMemberById(req, res) {
   try {
     const member = await Member.findByPk(req.params.id);
     if (!member) return res.status(404).json({ error: 'Member not found' });
+    if (req.officer && req.officer.role === 'client' && req.officer.society_id && member.society_id !== req.officer.society_id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     res.json(member);
   } catch (err) {
     res.status(500).json({ error: err.message });

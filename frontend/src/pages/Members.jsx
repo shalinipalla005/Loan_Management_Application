@@ -7,6 +7,15 @@ import {
 } from '@mui/material';
 
 export default function Members() {
+  const tokenPayload = (() => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return {};
+      return JSON.parse(atob(token.split('.')[1]));
+    } catch { return {}; }
+  })();
+  const role = tokenPayload.role;
+  const societyId = tokenPayload.society_id;
   const [members, setMembers] = useState([]);
   const [societies, setSocieties] = useState([]);
   const [open, setOpen] = useState(false);
@@ -29,7 +38,7 @@ export default function Members() {
   const [memberDues, setMemberDues] = useState([]);
   const [loanSavings, setLoanSavings] = useState({});
   const [clearLoading, setClearLoading] = useState(false);
-  const userRole = localStorage.getItem('role'); // or get from context/auth
+  const userRole = role;
 
   const fetchMembers = async () => {
     try {
@@ -163,54 +172,62 @@ export default function Members() {
       <Box sx={{ flexGrow: 1, width: '100%' }}>
         <Paper sx={{ width: '100%', maxWidth: '100%', mx: 0, p: 3, bgcolor: 'background.default', boxShadow: 2 }}>
           <Typography variant="h4" sx={{ mb: 3, fontWeight: 700, color: 'primary.main' }}>Members</Typography>
-          <Box display="flex" justifyContent="flex-end" mb={2}>
-            <Button 
-              variant="contained" 
-              onClick={() => handleOpen()} 
-              disabled={loading}
-              sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
-            >
-              Add Member
-            </Button>
-          </Box>
+          {role !== 'client' && (
+            <Box display="flex" justifyContent="flex-end" mb={2}>
+              <Button 
+                variant="contained" 
+                onClick={() => handleOpen()} 
+                disabled={loading}
+                sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
+              >
+                Add Member
+              </Button>
+            </Box>
+          )}
           {loading && <Typography>Loading...</Typography>}
           <TableContainer sx={{ width: '100%' }}>
             <Table>
-              <TableHead>
+                  <TableHead>
                 <TableRow sx={{ bgcolor: 'primary.light' }}>
                   <TableCell>Name</TableCell>
                   <TableCell>Membership #</TableCell>
                   <TableCell>Contact</TableCell>
                   <TableCell>Email</TableCell>
+                  <TableCell>Society</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {members.map(mem => (
-                  <TableRow key={mem.member_id}>
+                   <TableRow key={mem.member_id}>
                     <TableCell>{mem.member_name}</TableCell>
                     <TableCell>{mem.membership_number}</TableCell>
                     <TableCell>{mem.contact_number || '-'}</TableCell>
                     <TableCell>{mem.email || '-'}</TableCell>
-                    <TableCell>{mem.status}</TableCell>
+                  <TableCell>{mem.society_id || '-'}</TableCell>
+                  <TableCell>{mem.status}</TableCell>
                     <TableCell>
-                      <Button 
-                        onClick={() => handleOpen(mem)}
-                        disabled={loading}
-                        size="small"
-                        sx={{ mr: 1 }}
-                      >
-                        Edit
-                      </Button>
-                      <Button 
-                        color="error" 
-                        onClick={() => handleDelete(mem.member_id)}
-                        disabled={loading}
-                        size="small"
-                      >
-                        Delete
-                      </Button>
+                      {role !== 'client' && (
+                        <>
+                          <Button 
+                            onClick={() => handleOpen(mem)}
+                            disabled={loading}
+                            size="small"
+                            sx={{ mr: 1 }}
+                          >
+                            Edit
+                          </Button>
+                          <Button 
+                            color="error" 
+                            onClick={() => handleDelete(mem.member_id)}
+                            disabled={loading}
+                            size="small"
+                          >
+                            Delete
+                          </Button>
+                        </>
+                      )}
                       <Button onClick={() => handleOpenProfile(mem.member_id)} disabled={loading} size="small">Profile</Button>
                     </TableCell>
                   </TableRow>

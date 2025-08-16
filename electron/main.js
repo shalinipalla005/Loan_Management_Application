@@ -15,8 +15,8 @@ function resolveBackendEntry() {
   return path.join(appPath, 'backend', 'server.js');
 }
 
-// Use hosted backend in all environments unless explicitly overridden
-const REMOTE_BACKEND_URL = process.env.REMOTE_BACKEND_URL || 'https://loan-management-application.onrender.com/api';
+// Default to local backend; switch to hosted by setting REMOTE_BACKEND_URL
+const REMOTE_BACKEND_URL = process.env.REMOTE_BACKEND_URL || '';
 
 async function startBackend() {
   // Hosted backend mode: do not start local server

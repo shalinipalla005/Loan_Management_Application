@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/societyController');
+const { requireOfficer, forbidClientCreate } = require('../middleware/auth');
 
-router.get('/', controller.list);
-router.get('/:id', controller.get);
-router.post('/', controller.create);
-router.put('/:id', controller.update);
-router.delete('/:id', controller.delete);
+router.get('/', requireOfficer, controller.list);
+router.get('/:id', requireOfficer, controller.get);
+router.post('/', requireOfficer, forbidClientCreate, controller.create);
+router.put('/:id', requireOfficer, forbidClientCreate, controller.update);
+router.delete('/:id', requireOfficer, forbidClientCreate, controller.delete);
 
 module.exports = router; 

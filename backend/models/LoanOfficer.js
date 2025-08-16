@@ -9,7 +9,7 @@ const LoanOfficer = sequelize.define('LoanOfficer', {
   contact_number: { type: DataTypes.STRING },
   email: { type: DataTypes.STRING, unique: true },
   password: { type: DataTypes.STRING, allowNull: false },
-  role: { type: DataTypes.ENUM('admin', 'officer', 'auditor'), defaultValue: 'officer' },
+  role: { type: DataTypes.ENUM('admin', 'officer', 'auditor', 'client'), defaultValue: 'officer' },
   designation: { type: DataTypes.STRING },
   hire_date: { type: DataTypes.DATE },
   status: { type: DataTypes.STRING, defaultValue: 'ACTIVE' },

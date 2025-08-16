@@ -3,7 +3,13 @@ const IDGenerator = require('../utils/idGenerator');
 
 exports.list = async (req, res) => {
   try {
+    const where = {};
+    // If a client is logged in, restrict to their society
+    if (req.officer && req.officer.role === 'client' && req.officer.society_id) {
+      where.society_id = req.officer.society_id;
+    }
     const loans = await Loan.findAll({
+      where,
       order: [['created_at', 'DESC']]
     });
     res.json(loans);
@@ -17,6 +23,9 @@ exports.get = async (req, res) => {
   try {
     const loan = await Loan.findByPk(req.params.id);
     if (!loan) return res.status(404).json({ error: 'Loan not found' });
+    if (req.officer && req.officer.role === 'client' && req.officer.society_id && loan.society_id !== req.officer.society_id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     res.json(loan);
   } catch (err) {
     console.error(err);
@@ -31,8 +40,15 @@ exports.create = async (req, res) => {
       req.body.loan_number = await IDGenerator.generateLoanId();
     }
     
-    // Set default values
-    req.body.society_id = req.body.society_id || 1; // Default to first society
+    // Resolve society_id from member to ensure consistency
+    if (!req.body.member_id) {
+      return res.status(400).json({ error: 'member_id is required' });
+    }
+    const member = await Member.findByPk(req.body.member_id);
+    if (!member) {
+      return res.status(400).json({ error: 'Invalid member_id' });
+    }
+    req.body.society_id = member.society_id;
     req.body.loan_status = req.body.loan_status || 'PENDING';
     req.body.disbursement_date = req.body.disbursement_date || new Date();
     req.body.monthly_savings = req.body.monthly_savings || 200.00;
@@ -68,6 +84,14 @@ exports.update = async (req, res) => {
   try {
     const loan = await Loan.findByPk(req.params.id);
     if (!loan) return res.status(404).json({ error: 'Loan not found' });
+    // If member_id is being changed, align society_id with the new member
+    if (req.body.member_id && req.body.member_id !== loan.member_id) {
+      const newMember = await Member.findByPk(req.body.member_id);
+      if (!newMember) {
+        return res.status(400).json({ error: 'Invalid member_id' });
+      }
+      req.body.society_id = newMember.society_id;
+    }
     await loan.update(req.body);
     res.json(loan);
   } catch (err) {
@@ -98,7 +122,8 @@ exports.delete = async (req, res) => {
 
 exports.clearLoan = async (req, res) => {
   try {
-    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'official')) {
+    const actor = req.officer;
+    if (!actor || (actor.role !== 'admin' && actor.role !== 'officer')) {
       return res.status(403).json({ error: 'Only officials or admins can clear loans.' });
     }
     const loan = await Loan.findByPk(req.params.id);
@@ -170,4 +195,47 @@ exports.getLoanSavings = async (req, res) => {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
-}; 
+};
+
+// Handle loan disbursement
+exports.disburseLoan = async (req, res) => {
+  try {
+    const loan = await Loan.findByPk(req.params.id);
+    if (!loan) {
+      return res.status(404).json({ error: 'Loan not found' });
+    }
+
+    if (loan.loan_status !== 'PENDING') {
+      return res.status(400).json({ error: 'Loan is not in PENDING status' });
+    }
+
+    // Update loan status to DISBURSED
+    await loan.update({
+      loan_status: 'DISBURSED',
+      disbursement_date: req.body.disbursement_date || new Date(),
+      disbursed_by: req.officer ? req.officer.loan_officer_id : null
+    });
+
+    // Update repayment schedules if they exist
+    const schedules = await RepaymentSchedule.findAll({
+      where: { loan_id: loan.loan_id }
+    });
+
+    if (schedules.length > 0) {
+      for (let schedule of schedules) {
+        await schedule.update({
+          payment_status: 'PENDING'
+        });
+      }
+    }
+
+    res.json({
+      message: 'Loan successfully disbursed',
+      loan: loan
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};

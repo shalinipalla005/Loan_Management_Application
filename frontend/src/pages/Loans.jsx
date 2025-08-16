@@ -8,6 +8,14 @@ import {
 import GetAppIcon from '@mui/icons-material/GetApp';
 
 export default function Loans() {
+  const role = (() => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return null;
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.role;
+    } catch { return null; }
+  })();
   const [loans, setLoans] = useState([]);
   const [members, setMembers] = useState([]);
   const [officers, setOfficers] = useState([]);
@@ -193,14 +201,16 @@ export default function Loans() {
         <Paper sx={{ width: '100%', maxWidth: '100%', mx: 0, p: 3, bgcolor: 'background.default', boxShadow: 2 }}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
             <Typography variant="h4" sx={{ color: 'primary.main', fontWeight: 700 }}>Loans</Typography>
-            <Button 
-              variant="contained" 
-              onClick={() => handleOpen()} 
-              disabled={loading}
-              sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
-            >
-              Add Loan
-            </Button>
+            {role !== 'client' && (
+              <Button 
+                variant="contained" 
+                onClick={() => handleOpen()} 
+                disabled={loading}
+                sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
+              >
+                Add Loan
+              </Button>
+            )}
           </Box>
           {loading && <Typography>Loading...</Typography>}
           <TableContainer sx={{ width: '100%' }}>
@@ -226,23 +236,27 @@ export default function Loans() {
                     <TableCell>₹{loan.loan_amount?.toLocaleString() || '-'}</TableCell>
                     <TableCell>{loan.loan_status}</TableCell>
                     <TableCell>
-                      <Button 
-                        onClick={() => handleOpen(loan)}
-                        disabled={loading}
-                        size="small"
-                        sx={{ mr: 1 }}
-                      >
-                        Edit
-                      </Button>
-                      <Button 
-                        color="error" 
-                        onClick={() => handleDelete(loan.loan_id)}
-                        disabled={loading}
-                        size="small"
-                        sx={{ mr: 1 }}
-                      >
-                        Delete
-                      </Button>
+                      {role !== 'client' && (
+                        <>
+                          <Button 
+                            onClick={() => handleOpen(loan)}
+                            disabled={loading}
+                            size="small"
+                            sx={{ mr: 1 }}
+                          >
+                            Edit
+                          </Button>
+                          <Button 
+                            color="error" 
+                            onClick={() => handleDelete(loan.loan_id)}
+                            disabled={loading}
+                            size="small"
+                            sx={{ mr: 1 }}
+                          >
+                            Delete
+                          </Button>
+                        </>
+                      )}
                       <Button 
                         onClick={() => handleOpenProfile(loan.loan_id)} 
                         disabled={loading} 

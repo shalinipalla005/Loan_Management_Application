@@ -1,14 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/loanController');
+const { requireOfficer, forbidClientCreate } = require('../middleware/auth');
 
-router.get('/', controller.list);
-router.get('/:id', controller.get);
-router.post('/', controller.create);
-router.put('/:id', controller.update);
-router.delete('/:id', controller.delete);
-router.patch('/:id/clear', controller.clearLoan);
-router.get('/:id/dues', controller.getLoanDues);
-router.get('/:id/savings', controller.getLoanSavings);
+router.get('/', requireOfficer, controller.list);
+router.get('/:id', requireOfficer, controller.get);
+router.post('/', requireOfficer, forbidClientCreate, controller.create);
+router.put('/:id', requireOfficer, forbidClientCreate, controller.update);
+router.delete('/:id', requireOfficer, forbidClientCreate, controller.delete);
+router.patch('/:id/clear', requireOfficer, controller.clearLoan);
+router.get('/:id/dues', requireOfficer, controller.getLoanDues);
+router.get('/:id/savings', requireOfficer, controller.getLoanSavings);
+router.post('/:id/disburse', requireOfficer, forbidClientCreate, controller.disburseLoan);
 
 module.exports = router; 

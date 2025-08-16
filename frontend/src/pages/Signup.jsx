@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, TextField, Paper, Typography, Box, Alert } from '@mui/material';
+import { Button, TextField, Paper, Typography, Box, Alert, MenuItem } from '@mui/material';
 import api from '../api/axios';
 import { useNavigate } from 'react-router-dom';
 
@@ -11,6 +11,8 @@ export default function Signup() {
     contact_number: '',
     designation: '',
     society_id: '',
+    account_type: 'employee',
+    registration_number: '',
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -65,11 +67,39 @@ export default function Signup() {
             fullWidth margin="normal"
           />
           <TextField
-            label="Designation"
-            value={form.designation}
-            onChange={e => setForm(f => ({ ...f, designation: e.target.value }))}
+            select
+            label="Account Type"
+            value={form.account_type}
+            onChange={e => setForm(f => ({ ...f, account_type: e.target.value }))}
             fullWidth margin="normal"
-          />
+          >
+            <MenuItem value="employee">Employee</MenuItem>
+            <MenuItem value="society">Society</MenuItem>
+          </TextField>
+          {form.account_type === 'employee' && (
+            <TextField
+              label="Designation"
+              value={form.designation}
+              onChange={e => setForm(f => ({ ...f, designation: e.target.value }))}
+              fullWidth margin="normal"
+            />
+          )}
+          {form.account_type === 'employee' && (
+            <TextField
+              label="Society ID"
+              value={form.society_id}
+              onChange={e => setForm(f => ({ ...f, society_id: e.target.value }))}
+              fullWidth margin="normal"
+            />
+          )}
+          {form.account_type === 'society' && (
+            <TextField
+              label="Society Registration Number"
+              value={form.registration_number}
+              onChange={e => setForm(f => ({ ...f, registration_number: e.target.value }))}
+              fullWidth margin="normal" required
+            />
+          )}
           {/* Optionally add society selection here */}
           {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
           {success && <Alert severity="success" sx={{ mt: 2 }}>{success}</Alert>}

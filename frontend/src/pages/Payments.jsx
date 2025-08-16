@@ -7,6 +7,14 @@ import {
 } from '@mui/material';
 
 export default function Payments() {
+  const role = (() => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return null;
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.role;
+    } catch { return null; }
+  })();
   const [payments, setPayments] = useState([]);
   const [loans, setLoans] = useState([]);
   const [open, setOpen] = useState(false);
@@ -143,7 +151,7 @@ export default function Payments() {
             <Button 
               variant="contained" 
               onClick={() => handleOpen()} 
-              disabled={loading}
+              disabled={loading || role === 'client'}
               sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
             >
               Add Payment
@@ -177,7 +185,7 @@ export default function Payments() {
                     <TableCell>
                       <Button 
                         onClick={() => handleOpen(payment)}
-                        disabled={loading}
+                        disabled={loading || role === 'client'}
                         size="small"
                         sx={{ mr: 1 }}
                       >
@@ -186,7 +194,7 @@ export default function Payments() {
                       <Button 
                         color="error" 
                         onClick={() => handleDelete(payment.payment_id)}
-                        disabled={loading}
+                        disabled={loading || role === 'client'}
                         size="small"
                       >
                         Delete

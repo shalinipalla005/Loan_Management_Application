@@ -9,7 +9,12 @@ const MemberSavings = require('../models/MemberSavings');
 // GET /api/loans - List all loan profiles with member details
 exports.getAllLoans = async (req, res) => {
   try {
+    const where = {};
+    if (req.officer && req.officer.role === 'client' && req.officer.society_id) {
+      where.society_id = req.officer.society_id;
+    }
     const loans = await Loan.findAll({
+      where,
       include: [{
         model: Member,
         as: 'member',
@@ -41,6 +46,9 @@ exports.getMembersWithLoans = async (req, res) => {
     const whereClause = {};
     if (status) whereClause.status = status;
     if (society_id) whereClause.society_id = society_id;
+    if (req.officer && req.officer.role === 'client' && req.officer.society_id) {
+      whereClause.society_id = req.officer.society_id;
+    }
 
     const loanWhereClause = {};
     if (req.query.loan_status) loanWhereClause.loan_status = req.query.loan_status;
@@ -123,6 +131,11 @@ exports.getMemberWithLoans = async (req, res) => {
         success: false,
         message: 'Member not found'
       });
+    }
+
+    // Client can only access members from their society
+    if (req.officer && req.officer.role === 'client' && req.officer.society_id && member.society_id !== req.officer.society_id) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
     const memberData = member.toJSON();

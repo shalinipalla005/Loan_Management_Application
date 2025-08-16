@@ -1,11 +1,11 @@
 import axios from 'axios';
 
-// Prefer Electron-provided backend URL if available, fallback to VITE_API_URL, then hosted default
+// Prefer Electron-provided backend URL if available, fallback to VITE_API_URL, then local default
 const electronBackendURL = typeof window !== 'undefined' && window.electron && window.electron.env
   ? window.electron.env.backendURL
   : undefined;
 
-const baseURL = electronBackendURL || import.meta.env.VITE_API_URL || 'https://loan-management-application.onrender.com/api';
+const baseURL = electronBackendURL || import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const api = axios.create({ baseURL });
 
 api.interceptors.request.use((config) => {

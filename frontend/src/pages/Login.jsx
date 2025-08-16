@@ -25,7 +25,7 @@ export default function Login() {
   return (
     <Box display="flex" alignItems="center" justifyContent="center" minHeight="100vh" bgcolor="#E7EFC7">
       <Paper style={{ maxWidth: 400, width: '100%', padding: 32 }} elevation={4}>
-        <Typography variant="h5" gutterBottom>Officer Login</Typography>
+        <Typography variant="h5" gutterBottom>Login</Typography>
         <form onSubmit={handleSubmit}>
           <TextField
             label="Employee ID or Email"

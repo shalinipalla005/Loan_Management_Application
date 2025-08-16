@@ -1,6 +1,6 @@
 const { Loan, Member, Society, LoanOfficer, LoanProduct, sequelize } = require('../models');
 const { Op } = require('sequelize');
-const XLSX = require('xlsx');
+const excel4node = require('excel4node');
 const fs = require('fs');
 const path = require('path');
 const { generateLoanSchedule } = require('../utils/helpers');
@@ -58,29 +58,117 @@ class ExportController {
         'Created At': loan.created_at ? new Date(loan.created_at).toISOString().split('T')[0] : ''
       }));
 
-      // Create Excel workbook
-      const workbook = XLSX.utils.book_new();
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
-      
-      // Set column widths
-      const colWidths = Object.keys(exportData[0] || {}).map(key => ({
-        wch: Math.max(key.length, 15)
-      }));
-      worksheet['!cols'] = colWidths;
+      // Create a new workbook and worksheet
+      const workbook = new excel4node.Workbook({
+        defaultFont: {
+          size: 11,
+          name: 'Calibri'
+        }
+      });
+      const worksheet = workbook.addWorksheet('All Loans');
 
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'All Loans');
+      // Create styles
+      const headerStyle = workbook.createStyle({
+        font: {
+          bold: true,
+          color: '#000000',
+        },
+        fill: {
+          type: 'pattern',
+          patternType: 'solid',
+          fgColor: '#CCCCCC'
+        },
+        border: {
+          left: { style: 'thin', color: '#000000' },
+          right: { style: 'thin', color: '#000000' },
+          top: { style: 'thin', color: '#000000' },
+          bottom: { style: 'thin', color: '#000000' }
+        }
+      });
+
+      const cellStyle = workbook.createStyle({
+        border: {
+          left: { style: 'thin', color: '#000000' },
+          right: { style: 'thin', color: '#000000' },
+          top: { style: 'thin', color: '#000000' },
+          bottom: { style: 'thin', color: '#000000' }
+        }
+      });
+
+      const numberStyle = workbook.createStyle({
+        numberFormat: '#,##0.00',
+        border: {
+          left: { style: 'thin', color: '#000000' },
+          right: { style: 'thin', color: '#000000' },
+          top: { style: 'thin', color: '#000000' },
+          bottom: { style: 'thin', color: '#000000' }
+        }
+      });
+
+      const dateStyle = workbook.createStyle({
+        numberFormat: 'yyyy-mm-dd',
+        border: {
+          left: { style: 'thin', color: '#000000' },
+          right: { style: 'thin', color: '#000000' },
+          top: { style: 'thin', color: '#000000' },
+          bottom: { style: 'thin', color: '#000000' }
+        }
+      });
+
+      // Write headers
+      const headers = Object.keys(exportData[0] || {});
+      headers.forEach((header, index) => {
+        worksheet.cell(1, index + 1)
+          .string(header)
+          .style(headerStyle);
+        
+        // Set column width based on header length
+        worksheet.column(index + 1).setWidth(Math.max(header.length + 2, 15));
+      });
+
+      // Write data
+      exportData.forEach((row, rowIndex) => {
+        headers.forEach((header, colIndex) => {
+          const cell = worksheet.cell(rowIndex + 2, colIndex + 1);
+          const value = row[header];
+
+          if (typeof value === 'number') {
+            cell.number(value).style(numberStyle);
+          } else if (header.toLowerCase().includes('date') && value && value !== '') {
+            // Handle date strings properly
+            try {
+              const dateValue = new Date(value);
+              if (!isNaN(dateValue.getTime())) {
+                cell.date(dateValue).style(dateStyle);
+              } else {
+                cell.string(value.toString()).style(cellStyle);
+              }
+            } catch (e) {
+              cell.string(value.toString()).style(cellStyle);
+            }
+          } else {
+            cell.string(value ? value.toString() : '').style(cellStyle);
+          }
+        });
+      });
 
       // Generate filename with timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
       const filename = `all_loans_export_${timestamp}.xlsx`;
-      
-      // Create buffer
-      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-      // Set headers and send file
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.send(buffer);
+      // Write to buffer
+      workbook.writeToBuffer().then(buffer => {
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.send(buffer);
+      }).catch(err => {
+        console.error('Error generating Excel file:', err);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to generate Excel file',
+          error: err.message
+        });
+      });
 
     } catch (error) {
       console.error('Export all loans error:', error);
@@ -129,105 +217,130 @@ class ExportController {
       // Generate loan schedule
       const schedule = generateLoanSchedule(loan);
 
-      // Prepare loan profile data
-      const loanProfileData = [{
-        'Field': 'Loan ID',
-        'Value': loan.loan_id
-      }, {
-        'Field': 'Loan Number',
-        'Value': loan.loan_number
-      }, {
-        'Field': 'Member Name',
-        'Value': loan.Member?.member_name || ''
-      }, {
-        'Field': 'Membership Number',
-        'Value': loan.Member?.membership_number || ''
-      }, {
-        'Field': 'Contact Number',
-        'Value': loan.Member?.contact_number || ''
-      }, {
-        'Field': 'Email',
-        'Value': loan.Member?.email || ''
-      }, {
-        'Field': 'Address',
-        'Value': loan.Member?.address || ''
-      }, {
-        'Field': 'Society',
-        'Value': loan.Society?.society_name || ''
-      }, {
-        'Field': 'Loan Officer',
-        'Value': loan.LoanOfficer?.officer_name || ''
-      }, {
-        'Field': 'Product Name',
-        'Value': loan.LoanProduct?.product_name || ''
-      }, {
-        'Field': 'Loan Amount',
-        'Value': parseFloat(loan.loan_amount || 0)
-      }, {
-        'Field': 'Interest Rate (%)',
-        'Value': parseFloat(loan.interest_rate || 0)
-      }, {
-        'Field': 'Tenure (Months)',
-        'Value': loan.tenure_months || 0
-      }, {
-        'Field': 'Processing Fee',
-        'Value': parseFloat(loan.processing_fee || 0)
-      }, {
-        'Field': 'Monthly Savings',
-        'Value': parseFloat(loan.monthly_savings || 0)
-      }, {
-        'Field': 'Total Interest',
-        'Value': parseFloat(loan.total_interest || 0)
-      }, {
-        'Field': 'Total Payable',
-        'Value': parseFloat(loan.total_payable || 0)
-      }, {
-        'Field': 'Outstanding Principal',
-        'Value': parseFloat(loan.outstanding_principal || 0)
-      }, {
-        'Field': 'Outstanding Interest',
-        'Value': parseFloat(loan.outstanding_interest || 0)
-      }, {
-        'Field': 'Loan Status',
-        'Value': loan.loan_status || ''
-      }, {
-        'Field': 'Disbursement Date',
-        'Value': loan.disbursement_date ? new Date(loan.disbursement_date).toISOString().split('T')[0] : ''
-      }, {
-        'Field': 'First Due Date',
-        'Value': loan.first_due_date ? new Date(loan.first_due_date).toISOString().split('T')[0] : ''
-      }, {
-        'Field': 'Last Due Date',
-        'Value': loan.last_due_date ? new Date(loan.last_due_date).toISOString().split('T')[0] : ''
-      }, {
-        'Field': 'Created At',
-        'Value': loan.created_at ? new Date(loan.created_at).toISOString().split('T')[0] : ''
-      }];
+      // Create Excel workbook using excel4node
+      const workbook = new excel4node.Workbook({
+        defaultFont: {
+          size: 11,
+          name: 'Calibri'
+        }
+      });
 
-      // Create Excel workbook
-      const workbook = XLSX.utils.book_new();
-      
+      // Create styles
+      const headerStyle = workbook.createStyle({
+        font: { bold: true, color: '#000000' },
+        fill: { type: 'pattern', patternType: 'solid', fgColor: '#CCCCCC' },
+        border: {
+          left: { style: 'thin', color: '#000000' },
+          right: { style: 'thin', color: '#000000' },
+          top: { style: 'thin', color: '#000000' },
+          bottom: { style: 'thin', color: '#000000' }
+        }
+      });
+
+      const cellStyle = workbook.createStyle({
+        border: {
+          left: { style: 'thin', color: '#000000' },
+          right: { style: 'thin', color: '#000000' },
+          top: { style: 'thin', color: '#000000' },
+          bottom: { style: 'thin', color: '#000000' }
+        }
+      });
+
+      const numberStyle = workbook.createStyle({
+        numberFormat: '#,##0.00',
+        border: {
+          left: { style: 'thin', color: '#000000' },
+          right: { style: 'thin', color: '#000000' },
+          top: { style: 'thin', color: '#000000' },
+          bottom: { style: 'thin', color: '#000000' }
+        }
+      });
+
       // Add loan profile sheet
-      const profileSheet = XLSX.utils.json_to_sheet(loanProfileData);
-      profileSheet['!cols'] = [{ wch: 25 }, { wch: 30 }];
-      XLSX.utils.book_append_sheet(workbook, profileSheet, 'Loan Profile');
+      const profileSheet = workbook.addWorksheet('Loan Profile');
       
+      const loanProfileData = [
+        ['Loan ID', loan.loan_id],
+        ['Loan Number', loan.loan_number],
+        ['Member Name', loan.Member?.member_name || ''],
+        ['Membership Number', loan.Member?.membership_number || ''],
+        ['Contact Number', loan.Member?.contact_number || ''],
+        ['Email', loan.Member?.email || ''],
+        ['Address', loan.Member?.address || ''],
+        ['Society', loan.Society?.society_name || ''],
+        ['Loan Officer', loan.LoanOfficer?.officer_name || ''],
+        ['Product Name', loan.LoanProduct?.product_name || ''],
+        ['Loan Amount', parseFloat(loan.loan_amount || 0)],
+        ['Interest Rate (%)', parseFloat(loan.interest_rate || 0)],
+        ['Tenure (Months)', loan.tenure_months || 0],
+        ['Processing Fee', parseFloat(loan.processing_fee || 0)],
+        ['Monthly Savings', parseFloat(loan.monthly_savings || 0)],
+        ['Total Interest', parseFloat(loan.total_interest || 0)],
+        ['Total Payable', parseFloat(loan.total_payable || 0)],
+        ['Outstanding Principal', parseFloat(loan.outstanding_principal || 0)],
+        ['Outstanding Interest', parseFloat(loan.outstanding_interest || 0)],
+        ['Loan Status', loan.loan_status || ''],
+        ['Disbursement Date', loan.disbursement_date ? new Date(loan.disbursement_date).toISOString().split('T')[0] : ''],
+        ['First Due Date', loan.first_due_date ? new Date(loan.first_due_date).toISOString().split('T')[0] : ''],
+        ['Last Due Date', loan.last_due_date ? new Date(loan.last_due_date).toISOString().split('T')[0] : ''],
+        ['Created At', loan.created_at ? new Date(loan.created_at).toISOString().split('T')[0] : '']
+      ];
+
+      // Write profile data
+      loanProfileData.forEach((row, rowIndex) => {
+        profileSheet.cell(rowIndex + 1, 1).string(row[0]).style(headerStyle);
+        const value = row[1];
+        if (typeof value === 'number') {
+          profileSheet.cell(rowIndex + 1, 2).number(value).style(numberStyle);
+        } else {
+          profileSheet.cell(rowIndex + 1, 2).string(value ? value.toString() : '').style(cellStyle);
+        }
+      });
+
+      profileSheet.column(1).setWidth(25);
+      profileSheet.column(2).setWidth(30);
+
       // Add schedule sheet if available
       if (schedule && schedule.length > 0) {
-        const scheduleSheet = XLSX.utils.json_to_sheet(schedule);
-        scheduleSheet['!cols'] = [
-          { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, 
-          { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 15 }
-        ];
-        XLSX.utils.book_append_sheet(workbook, scheduleSheet, 'Payment Schedule');
+        const scheduleSheet = workbook.addWorksheet('Payment Schedule');
+        
+        // Schedule headers
+        const scheduleHeaders = ['S.No.', 'Due Date', 'Opening Balance', 'Principal', 'Interest', 'Closing Balance', 'Monthly Savings', 'Total Payment', 'Status'];
+        
+        scheduleHeaders.forEach((header, index) => {
+          scheduleSheet.cell(1, index + 1).string(header).style(headerStyle);
+          scheduleSheet.column(index + 1).setWidth(15);
+        });
+
+        // Schedule data
+        schedule.forEach((row, rowIndex) => {
+          scheduleSheet.cell(rowIndex + 2, 1).number(row.installment_number || rowIndex + 1).style(cellStyle);
+          scheduleSheet.cell(rowIndex + 2, 2).string(row.due_date || '').style(cellStyle);
+          scheduleSheet.cell(rowIndex + 2, 3).number(parseFloat(row.opening_balance || 0)).style(numberStyle);
+          scheduleSheet.cell(rowIndex + 2, 4).number(parseFloat(row.principal_amount || 0)).style(numberStyle);
+          scheduleSheet.cell(rowIndex + 2, 5).number(parseFloat(row.interest_amount || 0)).style(numberStyle);
+          scheduleSheet.cell(rowIndex + 2, 6).number(parseFloat(row.closing_balance || 0)).style(numberStyle);
+          scheduleSheet.cell(rowIndex + 2, 7).number(parseFloat(row.monthly_savings || 0)).style(numberStyle);
+          scheduleSheet.cell(rowIndex + 2, 8).number(parseFloat(row.total_installment || 0)).style(numberStyle);
+          scheduleSheet.cell(rowIndex + 2, 9).string(row.payment_status || 'PENDING').style(cellStyle);
+        });
       }
 
       const filename = `loan_${loan.loan_number}_export.xlsx`;
-      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.send(buffer);
+      // Write to buffer
+      workbook.writeToBuffer().then(buffer => {
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.send(buffer);
+      }).catch(err => {
+        console.error('Error generating Excel file:', err);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to generate Excel file',
+          error: err.message
+        });
+      });
 
     } catch (error) {
       console.error('Export specific loan error:', error);
@@ -251,6 +364,10 @@ class ExportController {
         });
       }
 
+      // For import, we can use a different library or convert the excel4node workbook
+      // For now, let's use the existing XLSX library for reading files
+      const XLSX = require('xlsx');
+      
       // Read Excel file
       const workbook = XLSX.readFile(req.file.path);
       const sheetName = workbook.SheetNames[0];

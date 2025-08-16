@@ -7,6 +7,14 @@ import {
 } from '@mui/material';
 
 export default function Products() {
+  const role = (() => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return null;
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.role;
+    } catch { return null; }
+  })();
   const [products, setProducts] = useState([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ 
@@ -110,16 +118,18 @@ export default function Products() {
       <Box sx={{ flexGrow: 1, width: '100%' }}>
         <Paper sx={{ width: '100%', maxWidth: '100%', mx: 0, p: 3, bgcolor: 'background.default', boxShadow: 2 }}>
           <Typography variant="h4" sx={{ mb: 3, fontWeight: 700, color: 'primary.main' }}>Loan Products</Typography>
-          <Box display="flex" justifyContent="flex-end" mb={2}>
-            <Button 
-              variant="contained" 
-              onClick={() => handleOpen()} 
-              disabled={loading}
-              sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
-            >
-              Add Product
-            </Button>
-          </Box>
+          {role !== 'client' && (
+            <Box display="flex" justifyContent="flex-end" mb={2}>
+              <Button 
+                variant="contained" 
+                onClick={() => handleOpen()} 
+                disabled={loading}
+                sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
+              >
+                Add Product
+              </Button>
+            </Box>
+          )}
           {loading && <Typography>Loading...</Typography>}
           <TableContainer sx={{ width: '100%' }}>
             <Table>
@@ -144,22 +154,26 @@ export default function Products() {
                     <TableCell>{product.max_amount}</TableCell>
                     <TableCell>{product.status}</TableCell>
                     <TableCell>
-                      <Button 
-                        onClick={() => handleOpen(product)}
-                        disabled={loading}
-                        size="small"
-                        sx={{ mr: 1 }}
-                      >
-                        Edit
-                      </Button>
-                      <Button 
-                        color="error" 
-                        onClick={() => handleDelete(product.product_id)}
-                        disabled={loading}
-                        size="small"
-                      >
-                        Delete
-                      </Button>
+                      {role !== 'client' && (
+                        <>
+                          <Button 
+                            onClick={() => handleOpen(product)}
+                            disabled={loading}
+                            size="small"
+                            sx={{ mr: 1 }}
+                          >
+                            Edit
+                          </Button>
+                          <Button 
+                            color="error" 
+                            onClick={() => handleDelete(product.product_id)}
+                            disabled={loading}
+                            size="small"
+                          >
+                            Delete
+                          </Button>
+                        </>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -27,4 +27,12 @@ function requireAdmin(req, res, next) {
   });
 }
 
-module.exports = { requireOfficer, requireAdmin };
+// Forbid actions for client role (used on create endpoints)
+function forbidClientCreate(req, res, next) {
+  if (req.officer && req.officer.role === 'client') {
+    return res.status(403).json({ error: 'Clients are not allowed to perform this action' });
+  }
+  next();
+}
+
+module.exports = { requireOfficer, requireAdmin, forbidClientCreate };
