@@ -6,11 +6,28 @@ node_modules/
 # Testing
 /coverage
 
-# Production
+# Production and Build
 /build
 /dist
 dist-ssr
 *.local
+**/dist/
+**/build/
+**/release/
+**/win-unpacked/
+*.exe
+*.zip
+*.dmg
+*.app
+*.deb
+*.rpm
+*.AppImage
+
+# Electron specific
+**/node_modules/electron/
+**/node_modules/electron/dist/
+**/electron/dist/
+**/electron-builder/
 
 # Logs
 logs
