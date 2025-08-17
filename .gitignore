@@ -1,6 +1,12 @@
 # Node dependencies
 node_modules/
 */node_modules/
+**/node_modules/
+
+# Package lock files
+package-lock.json
+*/package-lock.json
+**/package-lock.json
 
 # React/Vite/CRA build outputs
 dist/
