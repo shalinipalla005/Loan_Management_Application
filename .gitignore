@@ -23,6 +23,17 @@ build/
 *.tar.gz
 *.snap
 
+# Large files
+dist/
+*/dist/
+dist/LoanManagement-1.0.1-x64-nsis.exe
+dist/LoanManagement-1.0.1-x64-portable.exe
+dist/LoanManagement-1.0.1-win.zip
+dist/win-unpacked/
+dist/win-unpacked/LoanManagement.exe
+node_modules/electron/dist/
+node_modules/electron/dist/electron.exe
+
 # Logs
 npm-debug.log*
 yarn-debug.log*
