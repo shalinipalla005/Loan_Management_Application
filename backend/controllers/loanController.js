@@ -49,7 +49,7 @@ exports.create = async (req, res) => {
       return res.status(400).json({ error: 'Invalid member_id' });
     }
     req.body.society_id = member.society_id;
-    req.body.loan_status = req.body.loan_status || 'PENDING';
+    req.body.loan_status = 'ACTIVE'; // Ensure loan status is set to ACTIVE
     req.body.disbursement_date = req.body.disbursement_date || new Date();
     req.body.monthly_savings = req.body.monthly_savings || 200.00;
     
@@ -69,6 +69,38 @@ exports.create = async (req, res) => {
     req.body.last_due_date = new Date(disbursementDate.getTime() + (tenureMonths * 30 * 24 * 60 * 60 * 1000));
     
     const loan = await Loan.create(req.body);
+    
+    // Generate repayment schedules for the new loan
+    const { generateLoanSchedule } = require('../utils/helpers');
+    
+    const schedule = generateLoanSchedule({
+      loan_amount: loan.loan_amount,
+      interest_rate: loan.interest_rate,
+      tenure_months: loan.tenure_months,
+      monthly_savings: loan.monthly_savings,
+      first_due_date: loan.first_due_date,
+      disbursement_date: loan.disbursement_date
+    });
+    
+    const scheduleRows = schedule.map((item, idx) => ({
+      loan_id: loan.loan_id,
+      installment_number: idx + 1,
+      due_date: item['Due Date'],
+      opening_balance: (parseFloat(loan.loan_amount) - (parseFloat(item['Principal']) * idx)).toFixed(2),
+      principal_amount: item['Principal'],
+      interest_amount: item['Interest'],
+      monthly_savings: item['Savings'],
+      total_installment: item['Total Amount'],
+      closing_balance: item['Remaining Principal'],
+      payment_status: 'PENDING',
+      paid_date: null,
+      paid_amount: 0.00,
+      penalty_applied: 0.00
+    }));
+    
+    await RepaymentSchedule.bulkCreate(scheduleRows);
+    console.log(`Generated ${scheduleRows.length} repayment schedules for loan ${loan.loan_id}`);
+    
     res.status(201).json(loan);
   } catch (err) {
     console.error(err);
@@ -197,8 +229,8 @@ exports.getLoanSavings = async (req, res) => {
   }
 };
 
-// Handle loan disbursement
-exports.disburseLoan = async (req, res) => {
+// Handle loan approval by admin
+exports.approveLoan = async (req, res) => {
   try {
     const loan = await Loan.findByPk(req.params.id);
     if (!loan) {
@@ -209,22 +241,148 @@ exports.disburseLoan = async (req, res) => {
       return res.status(400).json({ error: 'Loan is not in PENDING status' });
     }
 
-    // Update loan status to DISBURSED
+    // Update loan status to APPROVED
     await loan.update({
-      loan_status: 'DISBURSED',
-      disbursement_date: req.body.disbursement_date || new Date(),
-      disbursed_by: req.officer ? req.officer.loan_officer_id : null
+      loan_status: 'APPROVED',
+      updated_at: new Date()
     });
 
-    // Update repayment schedules if they exist
+    // Check if repayment schedules exist
     const schedules = await RepaymentSchedule.findAll({
       where: { loan_id: loan.loan_id }
     });
 
     if (schedules.length > 0) {
+      // Update existing schedules
       for (let schedule of schedules) {
         await schedule.update({
           payment_status: 'PENDING'
+        });
+      }
+    } else {
+      // Generate repayment schedules if they don't exist
+      const { generateLoanSchedule } = require('../utils/helpers');
+      
+      const schedule = generateLoanSchedule({
+        loan_amount: loan.loan_amount,
+        interest_rate: loan.interest_rate,
+        tenure_months: loan.tenure_months,
+        monthly_savings: loan.monthly_savings || 200.00,
+        first_due_date: loan.first_due_date,
+        disbursement_date: loan.disbursement_date || new Date()
+      });
+      
+      const scheduleRows = schedule.map((item, idx) => ({
+        loan_id: loan.loan_id,
+        installment_number: idx + 1,
+        due_date: item['Due Date'],
+        opening_balance: (parseFloat(loan.loan_amount) - (parseFloat(item['Principal']) * idx)).toFixed(2),
+        principal_amount: item['Principal'],
+        interest_amount: item['Interest'],
+        monthly_savings: item['Savings'],
+        total_installment: item['Total Amount'],
+        closing_balance: item['Remaining Principal'],
+        payment_status: 'PENDING',
+        paid_date: null,
+        paid_amount: 0.00,
+        penalty_applied: 0.00
+      }));
+      
+      await RepaymentSchedule.bulkCreate(scheduleRows);
+      console.log(`Generated ${scheduleRows.length} repayment schedules for loan ${loan.loan_id}`);
+    }
+
+    res.json({
+      message: 'Loan successfully approved',
+      loan: loan
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Handle loan disbursement
+exports.disburseLoan = async (req, res) => {
+  try {
+    const loan = await Loan.findByPk(req.params.id);
+    if (!loan) {
+      return res.status(404).json({ error: 'Loan not found' });
+    }
+
+    if (loan.loan_status !== 'PENDING' && loan.loan_status !== 'APPROVED') {
+      return res.status(400).json({ error: 'Loan must be in PENDING or APPROVED status' });
+    }
+
+    const disbursementDate = req.body.disbursement_date || new Date();
+    
+    // Update loan status to DISBURSED
+    await loan.update({
+      loan_status: 'DISBURSED',
+      disbursement_date: disbursementDate,
+      disbursed_by: req.officer ? req.officer.loan_officer_id : null
+    });
+
+    // Check if repayment schedules exist
+    const schedules = await RepaymentSchedule.findAll({
+      where: { loan_id: loan.loan_id }
+    });
+
+    if (schedules.length > 0) {
+      // Update existing schedules
+      for (let schedule of schedules) {
+        await schedule.update({
+          payment_status: 'PENDING'
+        });
+      }
+    } else {
+      // Generate repayment schedules if they don't exist
+      const { generateLoanSchedule } = require('../utils/helpers');
+      
+      // Calculate first due date if not set
+      let firstDueDate = loan.first_due_date;
+      if (!firstDueDate) {
+        firstDueDate = new Date(disbursementDate);
+        firstDueDate.setDate(firstDueDate.getDate() + 30); // 30 days after disbursement
+      }
+      
+      const schedule = generateLoanSchedule({
+        loan_amount: loan.loan_amount,
+        interest_rate: loan.interest_rate,
+        tenure_months: loan.tenure_months,
+        monthly_savings: loan.monthly_savings || 200.00,
+        first_due_date: firstDueDate,
+        disbursement_date: disbursementDate
+      });
+      
+      const scheduleRows = schedule.map((item, idx) => ({
+        loan_id: loan.loan_id,
+        installment_number: idx + 1,
+        due_date: item['Due Date'],
+        opening_balance: (parseFloat(loan.loan_amount) - (parseFloat(item['Principal']) * idx)).toFixed(2),
+        principal_amount: item['Principal'],
+        interest_amount: item['Interest'],
+        monthly_savings: item['Savings'],
+        total_installment: item['Total Amount'],
+        closing_balance: item['Remaining Principal'],
+        payment_status: 'PENDING',
+        paid_date: null,
+        paid_amount: 0.00,
+        penalty_applied: 0.00
+      }));
+      
+      await RepaymentSchedule.bulkCreate(scheduleRows);
+      console.log(`Generated ${scheduleRows.length} repayment schedules for loan ${loan.loan_id}`);
+      
+      // Update loan with calculated first and last due dates if they weren't set
+      if (!loan.first_due_date || !loan.last_due_date) {
+        const lastDueDate = new Date(firstDueDate);
+        lastDueDate.setMonth(lastDueDate.getMonth() + loan.tenure_months - 1);
+        
+        await loan.update({
+          first_due_date: firstDueDate,
+          last_due_date: lastDueDate
         });
       }
     }

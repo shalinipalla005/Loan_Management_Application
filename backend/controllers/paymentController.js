@@ -2,6 +2,8 @@ const { Payment, Loan, RepaymentSchedule } = require('../models');
 const { Op } = require('sequelize');
 const IDGenerator = require('../utils/idGenerator');
 
+
+
 exports.list = async (req, res) => {
   try {
     const payments = await Payment.findAll({
@@ -51,15 +53,15 @@ exports.create = async (req, res) => {
     }
 
     // Verify loan status
-    if (loan.status !== 'ACTIVE' && loan.status !== 'DISBURSED') {
+    if (loan.loan_status !== 'ACTIVE' && loan.loan_status !== 'DISBURSED' && loan.loan_status !== 'APPROVED') {
       return res.status(400).json({ 
-        error: `Cannot process payment. Loan status is ${loan.status}. Loan must be ACTIVE or DISBURSED.` 
+        error: `Cannot process payment. Loan status is ${loan.loan_status}. Loan must be ACTIVE, APPROVED or DISBURSED.` 
       });
     }
 
     console.log('Processing payment for loan:', {
       loan_id: loan.loan_id,
-      status: loan.status,
+      loan_status: loan.loan_status,
       amount: loan.loan_amount
     });
 
@@ -80,7 +82,7 @@ exports.create = async (req, res) => {
       // Debug log the loan details
       console.log('Loan details:', {
         loan_id: loan.loan_id,
-        status: loan.status,
+        loan_status: loan.loan_status,
         amount: loan.loan_amount
       });
       return res.status(400).json({ 
@@ -205,4 +207,4 @@ exports.delete = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-}; 
+};

@@ -12,5 +12,6 @@ router.patch('/:id/clear', requireOfficer, controller.clearLoan);
 router.get('/:id/dues', requireOfficer, controller.getLoanDues);
 router.get('/:id/savings', requireOfficer, controller.getLoanSavings);
 router.post('/:id/disburse', requireOfficer, forbidClientCreate, controller.disburseLoan);
+router.post('/:id/approve', requireOfficer, forbidClientCreate, controller.approveLoan);
 
-module.exports = router; 
+module.exports = router;
