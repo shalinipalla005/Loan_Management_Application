@@ -73,33 +73,46 @@ exports.create = async (req, res) => {
     // Generate repayment schedules for the new loan
     const { generateLoanSchedule } = require('../utils/helpers');
     
-    const schedule = generateLoanSchedule({
-      loan_amount: loan.loan_amount,
-      interest_rate: loan.interest_rate,
-      tenure_months: loan.tenure_months,
-      monthly_savings: loan.monthly_savings,
-      first_due_date: loan.first_due_date,
-      disbursement_date: loan.disbursement_date
+    // Check if repayment schedules already exist
+    const existingSchedules = await RepaymentSchedule.findAll({
+      where: { loan_id: loan.loan_id }
     });
     
-    const scheduleRows = schedule.map((item, idx) => ({
-      loan_id: loan.loan_id,
-      installment_number: idx + 1,
-      due_date: item['Due Date'],
-      opening_balance: (parseFloat(loan.loan_amount) - (parseFloat(item['Principal']) * idx)).toFixed(2),
-      principal_amount: item['Principal'],
-      interest_amount: item['Interest'],
-      monthly_savings: item['Savings'],
-      total_installment: item['Total Amount'],
-      closing_balance: item['Remaining Principal'],
-      payment_status: 'PENDING',
-      paid_date: null,
-      paid_amount: 0.00,
-      penalty_applied: 0.00
-    }));
-    
-    await RepaymentSchedule.bulkCreate(scheduleRows);
-    console.log(`Generated ${scheduleRows.length} repayment schedules for loan ${loan.loan_id}`);
+    if (existingSchedules.length === 0) {
+      const schedule = generateLoanSchedule({
+        loan_amount: loan.loan_amount,
+        interest_rate: loan.interest_rate,
+        tenure_months: loan.tenure_months,
+        monthly_savings: loan.monthly_savings,
+        first_due_date: loan.first_due_date,
+        disbursement_date: loan.disbursement_date
+      });
+      
+      if (schedule.length > 0) {
+        const scheduleRows = schedule.map((item, idx) => ({
+          loan_id: loan.loan_id,
+          installment_number: idx + 1,
+          due_date: item['Due Date'],
+          opening_balance: (parseFloat(loan.loan_amount) - (parseFloat(item['Principal']) * idx)).toFixed(2),
+          principal_amount: item['Principal'],
+          interest_amount: item['Interest'],
+          monthly_savings: item['Savings'],
+          total_installment: item['Total Amount'],
+          closing_balance: item['Remaining Principal'],
+          payment_status: 'PENDING',
+          paid_date: null,
+          paid_amount: 0.00,
+          penalty_applied: 0.00
+        }));
+        
+        await RepaymentSchedule.bulkCreate(scheduleRows);
+        console.log(`Generated ${scheduleRows.length} repayment schedules for loan ${loan.loan_id}`);
+      } else {
+        console.error(`Failed to generate repayment schedules for loan ${loan.loan_id}. Check loan parameters.`);
+      }
+    } else {
+      console.log(`Repayment schedules already exist for loan ${loan.loan_id}. Skipping generation.`);
+    }
     
     res.status(201).json(loan);
   } catch (err) {
@@ -259,37 +272,57 @@ exports.approveLoan = async (req, res) => {
           payment_status: 'PENDING'
         });
       }
+      console.log(`Updated ${schedules.length} existing repayment schedules for loan ${loan.loan_id}`);
     } else {
       // Generate repayment schedules if they don't exist
       const { generateLoanSchedule } = require('../utils/helpers');
+      
+      // Ensure we have a disbursement date
+      const disbursementDate = loan.disbursement_date || new Date();
+      
+      // Calculate first due date if not set
+      let firstDueDate = loan.first_due_date;
+      if (!firstDueDate) {
+        firstDueDate = new Date(disbursementDate);
+        firstDueDate.setDate(firstDueDate.getDate() + 30); // 30 days after disbursement
+        
+        // Update loan with the calculated first due date
+        await loan.update({
+          first_due_date: firstDueDate
+        });
+      }
       
       const schedule = generateLoanSchedule({
         loan_amount: loan.loan_amount,
         interest_rate: loan.interest_rate,
         tenure_months: loan.tenure_months,
         monthly_savings: loan.monthly_savings || 200.00,
-        first_due_date: loan.first_due_date,
-        disbursement_date: loan.disbursement_date || new Date()
+        first_due_date: firstDueDate,
+        disbursement_date: disbursementDate
       });
       
-      const scheduleRows = schedule.map((item, idx) => ({
-        loan_id: loan.loan_id,
-        installment_number: idx + 1,
-        due_date: item['Due Date'],
-        opening_balance: (parseFloat(loan.loan_amount) - (parseFloat(item['Principal']) * idx)).toFixed(2),
-        principal_amount: item['Principal'],
-        interest_amount: item['Interest'],
-        monthly_savings: item['Savings'],
-        total_installment: item['Total Amount'],
-        closing_balance: item['Remaining Principal'],
-        payment_status: 'PENDING',
-        paid_date: null,
-        paid_amount: 0.00,
-        penalty_applied: 0.00
-      }));
-      
-      await RepaymentSchedule.bulkCreate(scheduleRows);
-      console.log(`Generated ${scheduleRows.length} repayment schedules for loan ${loan.loan_id}`);
+      if (schedule.length > 0) {
+        const scheduleRows = schedule.map((item, idx) => ({
+          loan_id: loan.loan_id,
+          installment_number: idx + 1,
+          due_date: item['Due Date'],
+          opening_balance: (parseFloat(loan.loan_amount) - (parseFloat(item['Principal']) * idx)).toFixed(2),
+          principal_amount: item['Principal'],
+          interest_amount: item['Interest'],
+          monthly_savings: item['Savings'],
+          total_installment: item['Total Amount'],
+          closing_balance: item['Remaining Principal'],
+          payment_status: 'PENDING',
+          paid_date: null,
+          paid_amount: 0.00,
+          penalty_applied: 0.00
+        }));
+        
+        await RepaymentSchedule.bulkCreate(scheduleRows);
+        console.log(`Generated ${scheduleRows.length} repayment schedules for loan ${loan.loan_id}`);
+      } else {
+        console.error(`Failed to generate repayment schedules for loan ${loan.loan_id}. Check loan parameters.`);
+      }
     }
 
     res.json({
@@ -336,6 +369,7 @@ exports.disburseLoan = async (req, res) => {
           payment_status: 'PENDING'
         });
       }
+      console.log(`Updated ${schedules.length} existing repayment schedules for loan ${loan.loan_id}`);
     } else {
       // Generate repayment schedules if they don't exist
       const { generateLoanSchedule } = require('../utils/helpers');
@@ -356,34 +390,38 @@ exports.disburseLoan = async (req, res) => {
         disbursement_date: disbursementDate
       });
       
-      const scheduleRows = schedule.map((item, idx) => ({
-        loan_id: loan.loan_id,
-        installment_number: idx + 1,
-        due_date: item['Due Date'],
-        opening_balance: (parseFloat(loan.loan_amount) - (parseFloat(item['Principal']) * idx)).toFixed(2),
-        principal_amount: item['Principal'],
-        interest_amount: item['Interest'],
-        monthly_savings: item['Savings'],
-        total_installment: item['Total Amount'],
-        closing_balance: item['Remaining Principal'],
-        payment_status: 'PENDING',
-        paid_date: null,
-        paid_amount: 0.00,
-        penalty_applied: 0.00
-      }));
-      
-      await RepaymentSchedule.bulkCreate(scheduleRows);
-      console.log(`Generated ${scheduleRows.length} repayment schedules for loan ${loan.loan_id}`);
-      
-      // Update loan with calculated first and last due dates if they weren't set
-      if (!loan.first_due_date || !loan.last_due_date) {
-        const lastDueDate = new Date(firstDueDate);
-        lastDueDate.setMonth(lastDueDate.getMonth() + loan.tenure_months - 1);
+      if (schedule.length > 0) {
+        const scheduleRows = schedule.map((item, idx) => ({
+          loan_id: loan.loan_id,
+          installment_number: idx + 1,
+          due_date: item['Due Date'],
+          opening_balance: (parseFloat(loan.loan_amount) - (parseFloat(item['Principal']) * idx)).toFixed(2),
+          principal_amount: item['Principal'],
+          interest_amount: item['Interest'],
+          monthly_savings: item['Savings'],
+          total_installment: item['Total Amount'],
+          closing_balance: item['Remaining Principal'],
+          payment_status: 'PENDING',
+          paid_date: null,
+          paid_amount: 0.00,
+          penalty_applied: 0.00
+        }));
         
-        await loan.update({
-          first_due_date: firstDueDate,
-          last_due_date: lastDueDate
-        });
+        await RepaymentSchedule.bulkCreate(scheduleRows);
+        console.log(`Generated ${scheduleRows.length} repayment schedules for loan ${loan.loan_id}`);
+        
+        // Update loan with calculated first and last due dates if they weren't set
+        if (!loan.first_due_date || !loan.last_due_date) {
+          const lastDueDate = new Date(firstDueDate);
+          lastDueDate.setMonth(lastDueDate.getMonth() + loan.tenure_months - 1);
+          
+          await loan.update({
+            first_due_date: firstDueDate,
+            last_due_date: lastDueDate
+          });
+        }
+      } else {
+        console.error(`Failed to generate repayment schedules for loan ${loan.loan_id}. Check loan parameters.`);
       }
     }
 
