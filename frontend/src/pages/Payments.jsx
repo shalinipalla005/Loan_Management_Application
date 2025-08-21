@@ -149,11 +149,11 @@ export default function Payments() {
           <Typography variant="h4" sx={{ mb: 3, fontWeight: 700, color: 'primary.main' }}>Payments</Typography>
           <Box display="flex" justifyContent="flex-end" mb={2}>
             <Button 
-              variant="contained" 
-              onClick={() => handleOpen()} 
-              disabled={loading || role === 'client'}
-              sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
-            >
+                variant="contained" 
+                onClick={() => handleOpen()} 
+                disabled={loading === true || role === 'client'}
+                sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
+              >
               Add Payment
             </Button>
           </Box>
@@ -185,7 +185,7 @@ export default function Payments() {
                     <TableCell>
                       <Button 
                         onClick={() => handleOpen(payment)}
-                        disabled={loading || role === 'client'}
+                        disabled={loading === true || role === 'client'}
                         size="small"
                         sx={{ mr: 1 }}
                       >
@@ -194,7 +194,7 @@ export default function Payments() {
                       <Button 
                         color="error" 
                         onClick={() => handleDelete(payment.payment_id)}
-                        disabled={loading || role === 'client'}
+                        disabled={loading === true || role === 'client'}
                         size="small"
                       >
                         Delete
@@ -287,11 +287,11 @@ export default function Payments() {
               )}
             </DialogContent>
             <DialogActions>
-              <Button onClick={handleClose} disabled={loading}>Cancel</Button>
+              <Button onClick={handleClose} disabled={loading === true}>Cancel</Button>
               <Button 
                 onClick={handleSubmit} 
                 variant="contained" 
-                disabled={loading || !form.loan_id || !form.payment_amount}
+                disabled={loading === true || !form.loan_id || !form.payment_amount}
                 sx={{ bgcolor: '#8A784E', '&:hover': { bgcolor: '#3B3B1A' } }}
               >
                 {loading ? 'Saving...' : 'Save'}
@@ -322,4 +322,4 @@ export default function Payments() {
       </Box>
     </Box>
   );
-} 
+}
