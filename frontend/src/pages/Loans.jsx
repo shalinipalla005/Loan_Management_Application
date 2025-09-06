@@ -323,7 +323,14 @@ export default function Loans() {
                 select
                 label="Loan Product *"
                 value={form.product_id}
-                onChange={e => setForm(f => ({ ...f, product_id: e.target.value }))}
+                onChange={e => {
+                  const selectedProduct = products.find(p => p.product_id === e.target.value);
+                  setForm(f => ({ 
+                    ...f, 
+                    product_id: e.target.value,
+                    interest_rate: selectedProduct ? selectedProduct.interest_rate : ''
+                  }));
+                }}
                 fullWidth margin="normal" required
               >
                 {products.map(product => (
@@ -339,10 +346,11 @@ export default function Loans() {
                 fullWidth margin="normal" required type="number"
               />
               <TextField
-                label="Interest Rate (%) *"
+                label="Interest Rate (%)"
                 value={form.interest_rate}
                 onChange={e => setForm(f => ({ ...f, interest_rate: e.target.value }))}
-                fullWidth margin="normal" required type="number"
+                fullWidth margin="normal" type="number"
+                helperText="Auto-populated from selected loan product"
               />
               <TextField
                 label="Tenure (Months) *"
@@ -364,8 +372,7 @@ export default function Loans() {
                   !form.officer_id || 
                   !form.product_id || 
                   !form.loan_amount || 
-                  !form.tenure_months || 
-                  !form.interest_rate
+                  !form.tenure_months
                 }
                 sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
               >

@@ -138,80 +138,17 @@ exports.create = async (req, res) => {
       totalPaid
     });
 
-    // Update schedule with the payment
-    const updatedPaidAmount = (parseFloat(schedule.paid_amount || 0) + totalPaid).toFixed(2);
-    const totalRequired = parseFloat(schedule.total_installment);
-    
-    let newStatus;
-    if (parseFloat(updatedPaidAmount) >= totalRequired) {
-      newStatus = 'PAID';
-    } else if (parseFloat(updatedPaidAmount) > 0) {
-      newStatus = 'PARTIAL';
-    } else {
-      newStatus = 'PENDING';
-    }
+    // Note: Schedule update is handled by database trigger
+    // The trigger will update paid_amount, payment_status, and paid_date
+    // No need to update schedule here to avoid double processing
 
-    await schedule.update({
-      paid_amount: updatedPaidAmount,
-      paid_date: req.body.payment_date,
-      payment_status: newStatus
-    });
-
-    // Update loan outstanding FIRST - penalties are added to principal
-    let newOutstandingPrincipal = parseFloat(loan.outstanding_principal) - principalPaid + penaltyPaid;
-    let newOutstandingInterest = parseFloat(loan.outstanding_interest) - interestPaid;
-    let newStatusLoan = loan.loan_status;
-    
-    // Ensure outstanding amounts don't go negative
-    newOutstandingPrincipal = Math.max(0, newOutstandingPrincipal);
-    newOutstandingInterest = Math.max(0, newOutstandingInterest);
-    
-    if (newOutstandingPrincipal <= 0 && newOutstandingInterest <= 0) {
-      newStatusLoan = 'CLOSED';
-    } else if (loan.loan_status === 'PENDING') {
-      newStatusLoan = 'ACTIVE';
-    }
-
-    console.log('=== PAYMENT PROCESSING (SINGLE DEDUCTION) ===');
-    console.log('BEFORE payment - Loan outstanding amounts:', {
-      outstanding_principal: loan.outstanding_principal,
-      outstanding_interest: loan.outstanding_interest
-    });
-    console.log('Payment amounts:', {
-      principalPaid,
-      interestPaid,
-      penaltyPaid,
-      totalPaid
-    });
-    console.log('AFTER payment - New outstanding amounts:', {
-      newOutstandingPrincipal,
-      newOutstandingInterest
-    });
-    console.log('=== END PAYMENT PROCESSING (SINGLE DEDUCTION) ===');
-
-    // Update loan with new outstanding amounts
-    await loan.update({
-      outstanding_principal: newOutstandingPrincipal.toFixed(2),
-      outstanding_interest: newOutstandingInterest.toFixed(2),
-      loan_status: newStatusLoan
-    });
-
-    // Verify the update was successful
-    const updatedLoan = await Loan.findByPk(loan.loan_id);
-    console.log('=== LOAN UPDATE VERIFICATION ===');
-    console.log('Updated loan outstanding amounts:', {
-      outstanding_principal: updatedLoan.outstanding_principal,
-      outstanding_interest: updatedLoan.outstanding_interest
-    });
-    console.log('=== END LOAN UPDATE VERIFICATION ===');
-
-    // TODO: Redistribution will be handled separately to avoid double processing
-    // await redistributeScheduleAfterPayment(loan.loan_id);
+    // Note: Loan outstanding amounts are updated by database trigger
+    // No need to update loan here to avoid double deduction
 
     // Save payment record with correct amounts
     const paymentData = {
       ...req.body,
-      schedule_id: schedule.schedule_id,
+      schedule_id: schedule ? schedule.schedule_id : null, // Make schedule_id nullable
       principal_paid: principalPaid,
       interest_paid: interestPaid,
       savings_paid: savingsPaid,
@@ -221,6 +158,10 @@ exports.create = async (req, res) => {
     console.log('Creating payment with data:', paymentData);
     const payment = await Payment.create(paymentData);
     console.log('Payment created successfully:', payment.payment_id);
+    
+    // Now trigger redistribution after payment is created
+    await redistributeScheduleAfterPayment(loan.loan_id);
+    
     res.status(201).json(payment);
   } catch (err) {
     if (err.name === 'SequelizeUniqueConstraintError') {
@@ -277,14 +218,19 @@ async function redistributeScheduleAfterPayment(loanId) {
       return;
     }
 
-    // Get all pending and partial schedules
-    const pendingSchedules = await RepaymentSchedule.findAll({
+    // Get all schedules to find paid and pending ones
+    const allSchedules = await RepaymentSchedule.findAll({
       where: {
-        loan_id: loanId,
-        payment_status: ['PENDING', 'PARTIAL']
+        loan_id: loanId
       },
       order: [['installment_number', 'ASC']]
     });
+
+    // Separate paid and pending schedules
+    const paidSchedules = allSchedules.filter(sch => sch.payment_status === 'PAID');
+    const pendingSchedules = allSchedules.filter(sch => 
+      sch.payment_status === 'PENDING' || sch.payment_status === 'PARTIAL'
+    );
 
     if (pendingSchedules.length === 0) {
       console.log('No pending schedules to redistribute for loan:', loanId);
@@ -303,9 +249,10 @@ async function redistributeScheduleAfterPayment(loanId) {
       remainingPrincipal,
       remainingInterest,
       remainingMonths,
-      monthlySavings
+      monthlySavings,
+      paidSchedules: paidSchedules.length,
+      pendingSchedules: pendingSchedules.length
     });
-    console.log('=== END REDISTRIBUTION PROCESSING ===');
 
     // Get the next due date (from the first pending schedule)
     const nextDueDate = pendingSchedules[0].due_date;
@@ -320,36 +267,87 @@ async function redistributeScheduleAfterPayment(loanId) {
       nextDueDate
     );
 
-    // Delete existing pending/partial schedules (but keep the one we just updated)
+    console.log('Generated new schedule:', newSchedule);
+    console.log('=== END REDISTRIBUTION PROCESSING ===');
+
+    // Delete only pending/partial schedules (keep paid ones)
     await RepaymentSchedule.destroy({
       where: {
         loan_id: loanId,
-        payment_status: ['PENDING', 'PARTIAL'],
-        schedule_id: {
-          [Op.ne]: schedule.schedule_id // Don't delete the schedule we just updated
-        }
+        payment_status: ['PENDING', 'PARTIAL']
       }
     });
 
-    // Create new schedules
-    const scheduleRows = newSchedule.map((item, idx) => ({
-      loan_id: loanId,
-      installment_number: pendingSchedules[0].installment_number + idx,
-      due_date: item['Due Date'],
-      opening_balance: (remainingPrincipal - (parseFloat(item['Principal']) * idx)).toFixed(2),
-      principal_amount: item['Principal'],
-      interest_amount: item['Interest'],
-      monthly_savings: item['Savings'],
-      total_installment: item['Total Amount'],
-      closing_balance: item['Remaining Principal'],
-      payment_status: 'PENDING',
-      paid_date: null,
-      paid_amount: 0.00,
-      penalty_applied: 0.00
-    }));
+    // Create new schedules starting from the next installment number after paid ones
+    const nextInstallmentNumber = paidSchedules.length > 0 ? 
+      Math.max(...paidSchedules.map(sch => sch.installment_number)) + 1 : 
+      pendingSchedules[0].installment_number;
+
+    // Calculate opening balance for the first new installment
+    let currentOpeningBalance = remainingPrincipal;
+
+    const scheduleRows = newSchedule.map((item, idx) => {
+      const principalAmount = parseFloat(item['Principal']);
+      const interestAmount = parseFloat(item['Interest']);
+      const totalAmount = principalAmount + interestAmount + monthlySavings;
+      
+      const scheduleRow = {
+        loan_id: loanId,
+        installment_number: nextInstallmentNumber + idx,
+        due_date: item['Due Date'],
+        opening_balance: currentOpeningBalance.toFixed(2),
+        principal_amount: principalAmount.toFixed(2),
+        interest_amount: interestAmount.toFixed(2),
+        monthly_savings: monthlySavings.toFixed(2),
+        total_installment: totalAmount.toFixed(2),
+        closing_balance: (currentOpeningBalance - principalAmount).toFixed(2),
+        payment_status: 'PENDING',
+        paid_date: null,
+        paid_amount: 0.00,
+        penalty_applied: 0.00
+      };
+      
+      // Update opening balance for next iteration
+      currentOpeningBalance -= principalAmount;
+      
+      return scheduleRow;
+    });
 
     await RepaymentSchedule.bulkCreate(scheduleRows);
-    console.log(`Redistributed ${scheduleRows.length} schedules for loan ${loanId}`);
+    console.log(`Redistributed ${scheduleRows.length} schedules for loan ${loanId} starting from installment ${nextInstallmentNumber}`);
+
+    // Update any payments that don't have a valid schedule_id
+    const orphanedPayments = await Payment.findAll({
+      where: {
+        loan_id: loanId,
+        schedule_id: null
+      }
+    });
+
+    if (orphanedPayments.length > 0) {
+      console.log(`Found ${orphanedPayments.length} orphaned payments, updating schedule references...`);
+      
+      // Get the first installment for each orphaned payment
+      const firstInstallment = await RepaymentSchedule.findOne({
+        where: {
+          loan_id: loanId,
+          installment_number: 1
+        }
+      });
+
+      if (firstInstallment) {
+        await Payment.update(
+          { schedule_id: firstInstallment.schedule_id },
+          {
+            where: {
+              loan_id: loanId,
+              schedule_id: null
+            }
+          }
+        );
+        console.log(`Updated ${orphanedPayments.length} payments with schedule_id: ${firstInstallment.schedule_id}`);
+      }
+    }
 
   } catch (error) {
     console.error('Error redistributing schedule:', error);

@@ -64,15 +64,25 @@ async function initializeDatabase() {
       AFTER INSERT ON payments
       BEGIN
         UPDATE loans 
-        SET outstanding_principal = outstanding_principal - NEW.principal_paid,
-            outstanding_interest = outstanding_interest - NEW.interest_paid,
+        SET outstanding_principal = MAX(0, outstanding_principal - NEW.principal_paid + NEW.penalty_paid),
+            outstanding_interest = MAX(0, outstanding_interest - NEW.interest_paid),
+            loan_status = CASE 
+                WHEN (MAX(0, outstanding_principal - NEW.principal_paid + NEW.penalty_paid) <= 0 
+                      AND MAX(0, outstanding_interest - NEW.interest_paid) <= 0) 
+                THEN 'CLOSED'
+                WHEN loan_status = 'PENDING' 
+                THEN 'ACTIVE'
+                ELSE loan_status
+            END,
             updated_at = CURRENT_TIMESTAMP
         WHERE loan_id = NEW.loan_id;
         UPDATE repayment_schedule 
         SET payment_status = CASE 
-            WHEN (NEW.principal_paid + NEW.interest_paid + NEW.savings_paid) >= total_installment 
+            WHEN (paid_amount + NEW.payment_amount) >= total_installment 
             THEN 'PAID' 
-            ELSE 'PARTIAL' 
+            WHEN (paid_amount + NEW.payment_amount) > 0
+            THEN 'PARTIAL'
+            ELSE 'PENDING'
         END,
         paid_date = NEW.payment_date,
         paid_amount = paid_amount + NEW.payment_amount

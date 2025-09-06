@@ -1,6 +1,7 @@
 const Loan = require('../models/Loan');
 const Member = require('../models/Member');
 const RepaymentSchedule = require('../models/RepaymentSchedule');
+const LoanProduct = require('../models/LoanProduct');
 const { generateLoanSchedule } = require('../utils/helpers');
 const Payment = require('../models/Payment');
 const Penalty = require('../models/Penalty');
@@ -194,8 +195,20 @@ exports.createLoan = async (req, res) => {
       first_due_date
     } = req.body;
 
+    // Get loan product to use its interest rate as default if not provided
+    const loanProduct = await LoanProduct.findByPk(product_id);
+    if (!loanProduct) {
+      return res.status(404).json({
+        success: false,
+        message: 'Loan product not found'
+      });
+    }
+
+    // Use loan product's interest rate if not provided in request
+    const finalInterestRate = interest_rate || loanProduct.interest_rate;
+
     // Calculate loan details
-    const total_interest = (loan_amount * interest_rate * tenure_months) / (12 * 100);
+    const total_interest = (loan_amount * finalInterestRate * tenure_months) / (12 * 100);
     const total_payable = parseFloat(loan_amount) + parseFloat(total_interest);
     const last_due_date = new Date(first_due_date);
     last_due_date.setMonth(last_due_date.getMonth() + tenure_months - 1);
@@ -207,7 +220,7 @@ exports.createLoan = async (req, res) => {
       officer_id,
       product_id,
       loan_amount,
-      interest_rate,
+      interest_rate: finalInterestRate,
       tenure_months,
       processing_fee,
       monthly_savings: monthly_savings || 200.00,
@@ -224,7 +237,7 @@ exports.createLoan = async (req, res) => {
     // Generate and insert repayment schedule
     const schedule = generateLoanSchedule({
       loan_amount,
-      interest_rate,
+      interest_rate: finalInterestRate,
       tenure_months,
       monthly_savings: monthly_savings || 200.00,
       first_due_date,
@@ -287,6 +300,7 @@ exports.getLoanById = async (req, res) => {
           model: RepaymentSchedule,
           as: 'RepaymentSchedules',
           order: [['installment_number', 'ASC']]
+          
         },
         {
           model: Payment,
