@@ -172,6 +172,7 @@ exports.create = async (req, res) => {
       newStatusLoan = 'ACTIVE';
     }
 
+    console.log('=== PAYMENT PROCESSING ===');
     console.log('Loan outstanding calculation:', {
       currentOutstandingPrincipal: loan.outstanding_principal,
       principalPaid,
@@ -181,6 +182,7 @@ exports.create = async (req, res) => {
       interestPaid,
       newOutstandingInterest
     });
+    console.log('=== END PAYMENT PROCESSING ===');
 
     // Update loan with new outstanding amounts
     await loan.update({
@@ -190,7 +192,7 @@ exports.create = async (req, res) => {
     });
 
     // After updating loan outstanding amounts, redistribute remaining amounts across remaining months
-    await redistributeScheduleAfterPayment(loan.loan_id, principalPaid, interestPaid, savingsPaid, penaltyPaid);
+    await redistributeScheduleAfterPayment(loan.loan_id);
 
     // Save payment record with correct amounts
     const paymentData = {
@@ -250,7 +252,7 @@ exports.delete = async (req, res) => {
 };
 
 // Function to redistribute remaining amounts after payment
-async function redistributeScheduleAfterPayment(loanId, principalPaid, interestPaid, savingsPaid, penaltyPaid) {
+async function redistributeScheduleAfterPayment(loanId) {
   try {
     console.log('Starting schedule redistribution for loan:', loanId);
     
@@ -281,16 +283,15 @@ async function redistributeScheduleAfterPayment(loanId, principalPaid, interestP
     const remainingMonths = pendingSchedules.length;
     const monthlySavings = parseFloat(loan.monthly_savings || 0);
 
+    console.log('=== REDISTRIBUTION PROCESSING ===');
     console.log('Redistribution parameters:', {
       loanId,
       remainingPrincipal,
       remainingInterest,
       remainingMonths,
-      monthlySavings,
-      principalPaid,
-      interestPaid,
-      penaltyPaid
+      monthlySavings
     });
+    console.log('=== END REDISTRIBUTION PROCESSING ===');
 
     // Get the next due date (from the first pending schedule)
     const nextDueDate = pendingSchedules[0].due_date;
