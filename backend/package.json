@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "clear-data": "node scripts/clearData.js --force",
+    "flush-db": "node scripts/flushDatabase.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
