@@ -23,9 +23,10 @@ build/
 *.tar.gz
 *.snap
 
-# Large files
+# Large files and build artifacts
 dist/
 */dist/
+**/dist/
 dist/LoanManagement-1.0.1-x64-nsis.exe
 dist/LoanManagement-1.0.1-x64-portable.exe
 dist/LoanManagement-1.0.1-win.zip
@@ -33,6 +34,24 @@ dist/win-unpacked/
 dist/win-unpacked/LoanManagement.exe
 node_modules/electron/dist/
 node_modules/electron/dist/electron.exe
+
+# Electron build files
+*.exe
+*.dmg
+*.AppImage
+*.msi
+*.zip
+*.tar.gz
+*.snap
+
+# Large binary files
+**/*.exe
+**/*.dmg
+**/*.AppImage
+**/*.msi
+**/*.zip
+**/*.tar.gz
+**/*.snap
 
 # Logs
 npm-debug.log*

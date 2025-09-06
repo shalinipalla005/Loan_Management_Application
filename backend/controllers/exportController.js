@@ -214,9 +214,6 @@ class ExportController {
         });
       }
 
-      // Generate loan schedule
-      const schedule = generateLoanSchedule(loan);
-
       // Create Excel workbook using excel4node
       const workbook = new excel4node.Workbook({
         defaultFont: {
@@ -248,6 +245,16 @@ class ExportController {
 
       const numberStyle = workbook.createStyle({
         numberFormat: '#,##0.00',
+        border: {
+          left: { style: 'thin', color: '#000000' },
+          right: { style: 'thin', color: '#000000' },
+          top: { style: 'thin', color: '#000000' },
+          bottom: { style: 'thin', color: '#000000' }
+        }
+      });
+
+      const dateStyle = workbook.createStyle({
+        numberFormat: 'yyyy-mm-dd',
         border: {
           left: { style: 'thin', color: '#000000' },
           right: { style: 'thin', color: '#000000' },
@@ -292,6 +299,18 @@ class ExportController {
         const value = row[1];
         if (typeof value === 'number') {
           profileSheet.cell(rowIndex + 1, 2).number(value).style(numberStyle);
+        } else if (row[0].toLowerCase().includes('date') && value && value !== '') {
+          // Handle date strings properly
+          try {
+            const dateValue = new Date(value);
+            if (!isNaN(dateValue.getTime())) {
+              profileSheet.cell(rowIndex + 1, 2).date(dateValue).style(dateStyle);
+            } else {
+              profileSheet.cell(rowIndex + 1, 2).string(value.toString()).style(cellStyle);
+            }
+          } catch (e) {
+            profileSheet.cell(rowIndex + 1, 2).string(value.toString()).style(cellStyle);
+          }
         } else {
           profileSheet.cell(rowIndex + 1, 2).string(value ? value.toString() : '').style(cellStyle);
         }
@@ -299,6 +318,22 @@ class ExportController {
 
       profileSheet.column(1).setWidth(25);
       profileSheet.column(2).setWidth(30);
+
+      // Try to generate loan schedule, but don't fail if it doesn't work
+      let schedule = [];
+      try {
+        schedule = generateLoanSchedule({
+          loan_amount: loan.loan_amount,
+          interest_rate: loan.interest_rate,
+          tenure_months: loan.tenure_months,
+          monthly_savings: loan.monthly_savings,
+          first_due_date: loan.first_due_date,
+          disbursement_date: loan.disbursement_date
+        });
+      } catch (scheduleError) {
+        console.warn('Could not generate loan schedule:', scheduleError.message);
+        schedule = [];
+      }
 
       // Add schedule sheet if available
       if (schedule && schedule.length > 0) {
@@ -314,19 +349,41 @@ class ExportController {
 
         // Schedule data
         schedule.forEach((row, rowIndex) => {
-          scheduleSheet.cell(rowIndex + 2, 1).number(row.installment_number || rowIndex + 1).style(cellStyle);
-          scheduleSheet.cell(rowIndex + 2, 2).string(row.due_date || '').style(cellStyle);
-          scheduleSheet.cell(rowIndex + 2, 3).number(parseFloat(row.opening_balance || 0)).style(numberStyle);
-          scheduleSheet.cell(rowIndex + 2, 4).number(parseFloat(row.principal_amount || 0)).style(numberStyle);
-          scheduleSheet.cell(rowIndex + 2, 5).number(parseFloat(row.interest_amount || 0)).style(numberStyle);
-          scheduleSheet.cell(rowIndex + 2, 6).number(parseFloat(row.closing_balance || 0)).style(numberStyle);
-          scheduleSheet.cell(rowIndex + 2, 7).number(parseFloat(row.monthly_savings || 0)).style(numberStyle);
-          scheduleSheet.cell(rowIndex + 2, 8).number(parseFloat(row.total_installment || 0)).style(numberStyle);
-          scheduleSheet.cell(rowIndex + 2, 9).string(row.payment_status || 'PENDING').style(cellStyle);
+          scheduleSheet.cell(rowIndex + 2, 1).number(rowIndex + 1).style(cellStyle);
+          
+          // Handle due date properly
+          if (row['Due Date']) {
+            try {
+              const dateValue = new Date(row['Due Date']);
+              if (!isNaN(dateValue.getTime())) {
+                scheduleSheet.cell(rowIndex + 2, 2).date(dateValue).style(dateStyle);
+              } else {
+                scheduleSheet.cell(rowIndex + 2, 2).string(row['Due Date'].toString()).style(cellStyle);
+              }
+            } catch (e) {
+              scheduleSheet.cell(rowIndex + 2, 2).string(row['Due Date'].toString()).style(cellStyle);
+            }
+          } else {
+            scheduleSheet.cell(rowIndex + 2, 2).string('').style(cellStyle);
+          }
+          
+          // Calculate opening balance based on loan amount and previous payments
+          const openingBalance = rowIndex === 0 ? 
+            parseFloat(loan.loan_amount || 0) : 
+            parseFloat(schedule[rowIndex-1]['Remaining Principal'] || 0);
+          scheduleSheet.cell(rowIndex + 2, 3).number(openingBalance).style(numberStyle);
+          scheduleSheet.cell(rowIndex + 2, 4).number(parseFloat(row['Principal'] || 0)).style(numberStyle);
+          scheduleSheet.cell(rowIndex + 2, 5).number(parseFloat(row['Interest'] || 0)).style(numberStyle);
+          scheduleSheet.cell(rowIndex + 2, 6).number(parseFloat(row['Remaining Principal'] || 0)).style(numberStyle);
+          scheduleSheet.cell(rowIndex + 2, 7).number(parseFloat(row['Savings'] || 0)).style(numberStyle);
+          scheduleSheet.cell(rowIndex + 2, 8).number(parseFloat(row['Total Amount'] || 0)).style(numberStyle);
+          scheduleSheet.cell(rowIndex + 2, 9).string(row['Status'] || 'PENDING').style(cellStyle);
         });
       }
 
-      const filename = `loan_${loan.loan_number}_export.xlsx`;
+      // Generate filename with timestamp to avoid conflicts
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+      const filename = `loan_${loan.loan_number || loanId}_export_${timestamp}.xlsx`;
 
       // Write to buffer
       workbook.writeToBuffer().then(buffer => {

@@ -127,7 +127,7 @@ export default function Loans() {
       setExportLoading(true);
       const token = localStorage.getItem('token');
       const baseURL = (window.electron && window.electron.env && window.electron.env.backendURL) || '';
-      const response = await fetch(`${baseURL}/loans/${loanId}/export`, {
+      const response = await fetch(`${baseURL}/api/loans/${loanId}/export`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
