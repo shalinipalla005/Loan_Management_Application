@@ -66,24 +66,65 @@ export default function Payments() {
     setEditId(payment.payment_id || null);
     setOpen(true);
     setError('');
+    
+    // If editing existing payment, don't fetch loan dues
+    if (payment.payment_id) {
+      setLoanDues({});
+      return;
+    }
+    
+    // For new payments, fetch the next installment details
     if (payment.loan_id) {
-      const { data } = await api.get(`/loans/${payment.loan_id}`);
-      const loan = data.data;
-      // Find next due schedule
-      const nextDue = (loan.RepaymentSchedules || []).find(sch => sch.payment_status === 'PENDING' || sch.payment_status === 'OVERDUE' || sch.payment_status === 'PARTIAL');
-      setLoanDues({
-        principal: nextDue?.principal_amount || '',
-        interest: nextDue?.interest_amount || '',
-        savings: nextDue?.monthly_savings || '',
-        penalty: nextDue?.penalty_applied || ''
-      });
-      setForm(f => ({
-        ...f,
-        principal_paid: nextDue?.principal_amount || '',
-        interest_paid: nextDue?.interest_amount || '',
-        savings_paid: nextDue?.monthly_savings || '',
-        penalty_paid: nextDue?.penalty_applied || ''
-      }));
+      try {
+        const { data } = await api.get(`/loanprofiles/${payment.loan_id}`);
+        const loan = data.data;
+        
+        // Find next due schedule (first unpaid or partially paid)
+        const nextDue = loan.repaymentSchedule?.find(sch => 
+          sch.payment_status === 'PENDING' || 
+          sch.payment_status === 'OVERDUE' || 
+          sch.payment_status === 'PARTIAL'
+        );
+        
+        if (nextDue) {
+          // Calculate remaining amounts for this installment
+          const alreadyPaid = parseFloat(nextDue.paid_amount || 0);
+          const totalInstallment = parseFloat(nextDue.total_installment || 0);
+          const remainingAmount = Math.max(0, totalInstallment - alreadyPaid);
+          
+          // Calculate remaining breakdown
+          const remainingPrincipal = Math.max(0, parseFloat(nextDue.principal_amount || 0) - alreadyPaid);
+          const remainingInterest = Math.max(0, parseFloat(nextDue.interest_amount || 0) - alreadyPaid);
+          const remainingSavings = Math.max(0, parseFloat(nextDue.monthly_savings || 0) - alreadyPaid);
+          const remainingPenalty = Math.max(0, parseFloat(nextDue.penalty_applied || 0) - alreadyPaid);
+          
+          setLoanDues({
+            principal: remainingPrincipal,
+            interest: remainingInterest,
+            savings: remainingSavings,
+            penalty: remainingPenalty,
+            total: remainingAmount,
+            installment: nextDue.installment_number,
+            dueDate: nextDue.due_date
+          });
+          
+          // Pre-fill form with remaining amounts
+          setForm(f => ({
+            ...f,
+            principal_paid: remainingPrincipal,
+            interest_paid: remainingInterest,
+            savings_paid: remainingSavings,
+            penalty_paid: remainingPenalty,
+            payment_amount: remainingAmount
+          }));
+        } else {
+          setLoanDues({});
+        }
+      } catch (err) {
+        console.error('Error fetching loan details:', err);
+        setError('Failed to fetch loan details');
+        setLoanDues({});
+      }
     } else {
       setLoanDues({});
     }
@@ -103,6 +144,17 @@ export default function Payments() {
     }); 
     setEditId(null); 
     setError(''); 
+    setLoanDues({});
+  };
+
+  // Auto-calculate total payment amount when individual amounts change
+  const updatePaymentAmount = (field, value) => {
+    const newForm = { ...form, [field]: value };
+    const total = (parseFloat(newForm.principal_paid || 0) + 
+                  parseFloat(newForm.interest_paid || 0) + 
+                  parseFloat(newForm.savings_paid || 0) + 
+                  parseFloat(newForm.penalty_paid || 0)).toFixed(2);
+    setForm({ ...newForm, payment_amount: total });
   };
 
   const handleSubmit = async () => {
@@ -209,9 +261,20 @@ export default function Payments() {
           <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
             <DialogTitle>{editId ? 'Edit Payment' : 'Add Payment'}</DialogTitle>
             <DialogContent>
-              {loanDues && (loanDues.principal || loanDues.interest || loanDues.savings || loanDues.penalty) && (
+              {loanDues && loanDues.installment && (
                 <Alert severity="info" sx={{ mb: 2 }}>
-                  Next Due: Principal ₹{loanDues.principal}, Interest ₹{loanDues.interest}, Savings ₹{loanDues.savings}, Penalty ₹{loanDues.penalty}
+                  <Typography variant="subtitle2" gutterBottom>
+                    Next Due - Installment #{loanDues.installment} (Due: {new Date(loanDues.dueDate).toLocaleDateString()})
+                  </Typography>
+                  <Typography variant="body2">
+                    Principal: ₹{loanDues.principal?.toLocaleString() || '0'}, 
+                    Interest: ₹{loanDues.interest?.toLocaleString() || '0'}, 
+                    Savings: ₹{loanDues.savings?.toLocaleString() || '0'}, 
+                    Penalty: ₹{loanDues.penalty?.toLocaleString() || '0'}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', mt: 1 }}>
+                    Total Due: ₹{loanDues.total?.toLocaleString() || '0'}
+                  </Typography>
                 </Alert>
               )}
               <TextField
@@ -231,31 +294,52 @@ export default function Payments() {
                 <TextField
                   label="Payment Amount (₹) *"
                   value={form.payment_amount}
-                  onChange={e => setForm(f => ({ ...f, payment_amount: e.target.value }))}
+                  onChange={e => {
+                    const total = parseFloat(e.target.value || 0);
+                    const currentBreakdown = (parseFloat(form.principal_paid || 0) + 
+                                            parseFloat(form.interest_paid || 0) + 
+                                            parseFloat(form.savings_paid || 0) + 
+                                            parseFloat(form.penalty_paid || 0));
+                    
+                    if (currentBreakdown > 0) {
+                      // Proportionally distribute the new total
+                      const ratio = total / currentBreakdown;
+                      setForm(f => ({
+                        ...f,
+                        payment_amount: e.target.value,
+                        principal_paid: (parseFloat(f.principal_paid || 0) * ratio).toFixed(2),
+                        interest_paid: (parseFloat(f.interest_paid || 0) * ratio).toFixed(2),
+                        savings_paid: (parseFloat(f.savings_paid || 0) * ratio).toFixed(2),
+                        penalty_paid: (parseFloat(f.penalty_paid || 0) * ratio).toFixed(2)
+                      }));
+                    } else {
+                      setForm(f => ({ ...f, payment_amount: e.target.value }));
+                    }
+                  }}
                   fullWidth required type="number"
                 />
                 <TextField
                   label="Principal Paid (₹)"
                   value={form.principal_paid}
-                  onChange={e => setForm(f => ({ ...f, principal_paid: e.target.value }))}
+                  onChange={e => updatePaymentAmount('principal_paid', e.target.value)}
                   fullWidth type="number"
                 />
                 <TextField
                   label="Interest Paid (₹)"
                   value={form.interest_paid}
-                  onChange={e => setForm(f => ({ ...f, interest_paid: e.target.value }))}
+                  onChange={e => updatePaymentAmount('interest_paid', e.target.value)}
                   fullWidth type="number"
                 />
                 <TextField
                   label="Savings Paid (₹)"
                   value={form.savings_paid}
-                  onChange={e => setForm(f => ({ ...f, savings_paid: e.target.value }))}
+                  onChange={e => updatePaymentAmount('savings_paid', e.target.value)}
                   fullWidth type="number"
                 />
                 <TextField
                   label="Penalty Paid (₹)"
                   value={form.penalty_paid}
-                  onChange={e => setForm(f => ({ ...f, penalty_paid: e.target.value }))}
+                  onChange={e => updatePaymentAmount('penalty_paid', e.target.value)}
                   fullWidth type="number"
                 />
                 <TextField
@@ -278,10 +362,17 @@ export default function Payments() {
                 fullWidth margin="normal" multiline rows={2}
               />
               {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
-              {form.payment_amount && (
-                (parseFloat(form.payment_amount) < (parseFloat(loanDues.principal || 0) + parseFloat(loanDues.interest || 0) + parseFloat(loanDues.savings || 0) + parseFloat(loanDues.penalty || 0))) && (
+              {form.payment_amount && loanDues.total && (
+                parseFloat(form.payment_amount) < parseFloat(loanDues.total) && (
                   <Alert severity="warning" sx={{ mb: 2 }}>
-                    Payment is less than total due for this installment.
+                    Payment amount (₹{parseFloat(form.payment_amount).toLocaleString()}) is less than total due (₹{parseFloat(loanDues.total).toLocaleString()}) for this installment.
+                  </Alert>
+                )
+              )}
+              {form.payment_amount && loanDues.total && (
+                parseFloat(form.payment_amount) > parseFloat(loanDues.total) && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    Payment amount (₹{parseFloat(form.payment_amount).toLocaleString()}) exceeds total due (₹{parseFloat(loanDues.total).toLocaleString()}) for this installment. Excess amount will be applied to the next installment.
                   </Alert>
                 )
               )}

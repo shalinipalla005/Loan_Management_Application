@@ -65,10 +65,22 @@ exports.create = async (req, res) => {
       amount: loan.loan_amount
     });
 
-    let remaining = parseFloat(req.body.payment_amount);
-    let penaltyPaid = 0, interestPaid = 0, principalPaid = 0, savingsPaid = 0;
+    // Use the amounts provided in the request body (from frontend form)
+    let penaltyPaid = parseFloat(req.body.penalty_paid || 0);
+    let interestPaid = parseFloat(req.body.interest_paid || 0);
+    let principalPaid = parseFloat(req.body.principal_paid || 0);
+    let savingsPaid = parseFloat(req.body.savings_paid || 0);
+    const totalPaid = parseFloat(req.body.payment_amount);
 
-    // Find any installment for this loan
+    // Validate that the sum of individual amounts equals the total payment amount
+    const calculatedTotal = penaltyPaid + interestPaid + principalPaid + savingsPaid;
+    if (Math.abs(calculatedTotal - totalPaid) > 0.01) {
+      return res.status(400).json({ 
+        error: `Payment breakdown doesn't match total amount. Total: ₹${totalPaid}, Breakdown: ₹${calculatedTotal}` 
+      });
+    }
+
+    // Find the first unpaid or partially paid installment
     const allSchedules = await RepaymentSchedule.findAll({
       where: {
         loan_id: loan.loan_id
@@ -79,12 +91,6 @@ exports.create = async (req, res) => {
     console.log('Found schedules:', allSchedules.length, 'for loan:', loan.loan_id);
 
     if (!allSchedules || allSchedules.length === 0) {
-      // Debug log the loan details
-      console.log('Loan details:', {
-        loan_id: loan.loan_id,
-        loan_status: loan.loan_status,
-        amount: loan.loan_amount
-      });
       return res.status(400).json({ 
         error: "No installments found for this loan. Please ensure repayment schedules are generated.",
         loanId: loan.loan_id 
@@ -110,29 +116,19 @@ exports.create = async (req, res) => {
       return res.status(400).json({ error: "This installment is already fully paid. Please proceed to the next installment." });
     }
 
-    // 1. Penalty
-    if (schedule.penalty_applied > 0 && remaining > 0) {
-      penaltyPaid = Math.min(remaining, parseFloat(schedule.penalty_applied));
-      remaining -= penaltyPaid;
-    }
-    // 2. Interest
-    if (schedule.interest_amount > 0 && remaining > 0) {
-      interestPaid = Math.min(remaining, parseFloat(schedule.interest_amount));
-      remaining -= interestPaid;
-    }
-    // 3. Principal
-    if (schedule.principal_amount > 0 && remaining > 0) {
-      principalPaid = Math.min(remaining, parseFloat(schedule.principal_amount));
-      remaining -= principalPaid;
-    }
-    // 4. Savings
-    if (schedule.monthly_savings > 0 && remaining > 0) {
-      savingsPaid = Math.min(remaining, parseFloat(schedule.monthly_savings));
-      remaining -= savingsPaid;
+    // Validate payment amounts against schedule requirements
+    const remainingPenalty = Math.max(0, parseFloat(schedule.penalty_applied || 0) - parseFloat(schedule.paid_amount || 0));
+    const remainingInterest = Math.max(0, parseFloat(schedule.interest_amount || 0) - parseFloat(schedule.paid_amount || 0));
+    const remainingPrincipal = Math.max(0, parseFloat(schedule.principal_amount || 0) - parseFloat(schedule.paid_amount || 0));
+    const remainingSavings = Math.max(0, parseFloat(schedule.monthly_savings || 0) - parseFloat(schedule.paid_amount || 0));
+
+    // Warn if payment exceeds what's due for this installment
+    if (penaltyPaid > remainingPenalty || interestPaid > remainingInterest || 
+        principalPaid > remainingPrincipal || savingsPaid > remainingSavings) {
+      console.warn('Payment amounts exceed remaining amounts for this installment');
     }
 
-    // Update schedule
-    const totalPaid = penaltyPaid + interestPaid + principalPaid + savingsPaid;
+    // Update schedule with the payment
     const updatedPaidAmount = (parseFloat(schedule.paid_amount || 0) + totalPaid).toFixed(2);
     const totalRequired = parseFloat(schedule.total_installment);
     
