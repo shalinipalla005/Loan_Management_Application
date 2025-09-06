@@ -1,9 +1,29 @@
 const { Sequelize } = require('sequelize');
 const config = require('./config');
 
-const sequelize = new Sequelize(config.databaseUrl, {
-  logging: config.nodeEnv === 'development' ? console.log : false,
-});
+// Create Sequelize instance with appropriate configuration
+let sequelize;
+if (config.databaseUrl.startsWith('postgres://')) {
+  // PostgreSQL configuration
+  sequelize = new Sequelize(config.databaseUrl, {
+    logging: config.nodeEnv === 'development' ? console.log : false,
+    dialect: 'postgres',
+    dialectOptions: config.dbConfig.dialectOptions || {},
+    pool: {
+      max: 5,
+      min: 0,
+      acquire: 30000,
+      idle: 10000
+    }
+  });
+} else {
+  // SQLite configuration
+  sequelize = new Sequelize(config.databaseUrl, {
+    logging: config.nodeEnv === 'development' ? console.log : false,
+    dialect: 'sqlite',
+    storage: config.dbConfig.storage
+  });
+}
 
 // Test the connection
 sequelize

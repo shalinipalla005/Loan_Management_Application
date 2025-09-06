@@ -16,9 +16,9 @@ const AuditLog = require('./AuditLog');
 Member.belongsTo(Society, { foreignKey: 'society_id' });
 Loan.belongsTo(Member, { foreignKey: 'member_id', as: 'member' });
 Member.hasMany(Loan, { foreignKey: 'member_id' });
-Loan.belongsTo(Society, { foreignKey: 'society_id' });
-Loan.belongsTo(LoanOfficer, { foreignKey: 'officer_id' });
-Loan.belongsTo(LoanProduct, { foreignKey: 'product_id' });
+Loan.belongsTo(Society, { foreignKey: 'society_id', as: 'Society' });
+Loan.belongsTo(LoanOfficer, { foreignKey: 'officer_id', as: 'LoanOfficer' });
+Loan.belongsTo(LoanProduct, { foreignKey: 'product_id', as: 'LoanProduct' });
 LoanOfficer.belongsTo(Society, { foreignKey: 'society_id' });
 LoanProduct.belongsTo(Society, { foreignKey: 'society_id' });
 

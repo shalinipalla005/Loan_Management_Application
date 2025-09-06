@@ -10,10 +10,6 @@ import ReportIcon from '@mui/icons-material/Report';
 import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
 import PeopleIcon from '@mui/icons-material/People';
 import { Link } from 'react-router-dom';
-import GetAppIcon from '@mui/icons-material/GetApp';
-import { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
-import { Button } from '@mui/material';
 
 
 const drawerWidth = 240;
@@ -33,8 +29,6 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const role = getOfficerRole();
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [exportLoading, setExportLoading] = useState(false);
 
   const menu = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
@@ -48,8 +42,7 @@ export default function Sidebar() {
       text: 'Officers', 
       icon: role === 'admin' ? <SupervisorAccountIcon /> : <PeopleIcon />, 
       path: '/officers' 
-    },
-    { text: 'Export Loans', icon: <GetAppIcon />, action: 'exportLoans' }
+    }
   ];
 
   const handleLogout = () => {
@@ -57,75 +50,6 @@ export default function Sidebar() {
     navigate('/login');
   };
 
-  const handleExportLoans = () => {
-    setExportDialogOpen(true);
-  };
-
-  const handleDownload = async (format) => {
-    setExportLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found. Please login again.');
-      }
-      
-      const baseURL = (window.electron && window.electron.env && window.electron.env.backendURL) || 'http://localhost:3000';
-      let url = `${baseURL}/api/loans/export`;
-      let filename = 'all_loans_export.xlsx';
-      let contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-      if (format === 'pdf') {
-        url = `${baseURL}/api/loans/export/pdf`;
-        filename = 'all_loans_export.pdf';
-        contentType = 'application/pdf';
-      }
-
-      console.log('Exporting to URL:', url);
-      
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('Export failed:', res.status, errorText);
-        throw new Error(`Export failed: ${res.status} - ${errorText}`);
-      }
-      
-      const blob = await res.blob();
-      
-      // Check if the response is actually an Excel file
-      if (blob.size === 0) {
-        throw new Error('Received empty file from server');
-      }
-      
-      // Try to get filename from header
-      const disposition = res.headers.get('Content-Disposition');
-      if (disposition && disposition.includes('filename=')) {
-        filename = disposition.split('filename=')[1].replace(/"/g, '');
-      }
-      
-      const urlBlob = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = urlBlob;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(urlBlob);
-      
-      console.log('Export successful');
-    } catch (err) {
-      console.error('Export error:', err);
-      alert(`Export failed: ${err.message}`);
-    }
-    setExportLoading(false);
-    setExportDialogOpen(false);
-  };
 
   return (
     <Drawer
@@ -145,7 +69,7 @@ export default function Sidebar() {
       <Toolbar sx={{ minHeight: 64 }} />
       <Box sx={{ px: 2, py: 1 }}>
         <Typography variant="h6" noWrap color="primary.main" sx={{ fontWeight: 700, mb: 2, letterSpacing: 1 }}>
-          Loan App
+         
         </Typography>
         <List>
           {menu.map(item => (
@@ -155,7 +79,7 @@ export default function Sidebar() {
               key={item.text}
               to={item.path}
               selected={item.path && location.pathname === item.path}
-              onClick={item.action === 'exportLoans' ? handleExportLoans : undefined}
+              onClick={undefined}
               sx={{
                 borderRadius: 2,
                 mb: 0.5,
@@ -183,23 +107,6 @@ export default function Sidebar() {
           </Typography>
         </Box>
       </Box>
-      <Dialog open={exportDialogOpen} onClose={() => setExportDialogOpen(false)}>
-        <DialogTitle>Export Loans</DialogTitle>
-        <DialogContent>
-          <Typography>Choose the format to export all loans:</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => handleDownload('excel')} disabled={exportLoading}>
-            Excel
-          </Button>
-          {/* <Button onClick={() => handleDownload('pdf')} disabled={exportLoading}>
-            PDF
-          </Button> */}
-          <Button onClick={() => setExportDialogOpen(false)} disabled={exportLoading}>
-            Cancel
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Drawer>
   );
 }

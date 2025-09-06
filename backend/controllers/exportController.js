@@ -9,6 +9,7 @@ class ExportController {
   // GET /api/loans/export - Export all loans
   static async exportAllLoans(req, res) {
     try {
+      console.log('Export all loans - Starting...');
       const loans = await Loan.findAll({
         include: [
           {
@@ -18,20 +19,25 @@ class ExportController {
           },
           {
             model: Society,
+            as: 'Society',
             attributes: ['society_name']
           },
           {
             model: LoanOfficer,
+            as: 'LoanOfficer',
             attributes: ['officer_name']
           },
           {
             model: LoanProduct,
+            as: 'LoanProduct',
             attributes: ['product_name', 'interest_rate', 'processing_fee_rate']
           }
         ],
         order: [['created_at', 'DESC']]
       });
 
+      console.log(`Export all loans - Found ${loans.length} loans`);
+      
       // Transform data for export
       const exportData = loans.map(loan => ({
         'Loan ID': loan.loan_id,
@@ -58,6 +64,23 @@ class ExportController {
         'Loan Status': loan.loan_status || '',
         'Created At': loan.created_at ? new Date(loan.created_at).toISOString().split('T')[0] : ''
       }));
+
+      console.log(`Export all loans - Transformed ${exportData.length} records`);
+
+      // Handle case when no loans exist
+      if (exportData.length === 0) {
+        console.log('Export all loans - No loans found, creating empty file');
+        const workbook = new excel4node.Workbook();
+        const worksheet = workbook.addWorksheet('All Loans');
+        worksheet.cell(1, 1).string('No loans found');
+        
+        const filename = `all_loans_export_${new Date().toISOString().replace(/[:.]/g, '-').split('T')[0]}.xlsx`;
+        const buffer = await workbook.writeToBuffer();
+        
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        return res.send(buffer);
+      }
 
       // Create a new workbook and worksheet
       const workbook = new excel4node.Workbook({
@@ -196,14 +219,17 @@ class ExportController {
           },
           {
             model: Society,
+            as: 'Society',
             attributes: ['society_name']
           },
           {
             model: LoanOfficer,
+            as: 'LoanOfficer',
             attributes: ['officer_name', 'contact_number']
           },
           {
             model: LoanProduct,
+            as: 'LoanProduct',
             attributes: ['product_name', 'interest_rate', 'processing_fee_rate', 'monthly_savings_required']
           },
           {
