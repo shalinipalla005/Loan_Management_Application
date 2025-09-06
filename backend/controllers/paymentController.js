@@ -173,13 +173,18 @@ exports.create = async (req, res) => {
     }
 
     console.log('=== PAYMENT PROCESSING ===');
-    console.log('Loan outstanding calculation:', {
-      currentOutstandingPrincipal: loan.outstanding_principal,
+    console.log('BEFORE payment - Loan outstanding amounts:', {
+      outstanding_principal: loan.outstanding_principal,
+      outstanding_interest: loan.outstanding_interest
+    });
+    console.log('Payment amounts:', {
       principalPaid,
-      penaltyPaid,
-      newOutstandingPrincipal,
-      currentOutstandingInterest: loan.outstanding_interest,
       interestPaid,
+      penaltyPaid,
+      totalPaid
+    });
+    console.log('AFTER payment - New outstanding amounts:', {
+      newOutstandingPrincipal,
       newOutstandingInterest
     });
     console.log('=== END PAYMENT PROCESSING ===');
@@ -191,8 +196,17 @@ exports.create = async (req, res) => {
       loan_status: newStatusLoan
     });
 
-    // After updating loan outstanding amounts, redistribute remaining amounts across remaining months
-    await redistributeScheduleAfterPayment(loan.loan_id);
+    // Verify the update was successful
+    const updatedLoan = await Loan.findByPk(loan.loan_id);
+    console.log('=== LOAN UPDATE VERIFICATION ===');
+    console.log('Updated loan outstanding amounts:', {
+      outstanding_principal: updatedLoan.outstanding_principal,
+      outstanding_interest: updatedLoan.outstanding_interest
+    });
+    console.log('=== END LOAN UPDATE VERIFICATION ===');
+
+    // TODO: Redistribution will be handled separately to avoid double processing
+    // await redistributeScheduleAfterPayment(loan.loan_id);
 
     // Save payment record with correct amounts
     const paymentData = {
@@ -306,11 +320,14 @@ async function redistributeScheduleAfterPayment(loanId) {
       nextDueDate
     );
 
-    // Delete existing pending/partial schedules
+    // Delete existing pending/partial schedules (but keep the one we just updated)
     await RepaymentSchedule.destroy({
       where: {
         loan_id: loanId,
-        payment_status: ['PENDING', 'PARTIAL']
+        payment_status: ['PENDING', 'PARTIAL'],
+        schedule_id: {
+          [Op.ne]: schedule.schedule_id // Don't delete the schedule we just updated
+        }
       }
     });
 
