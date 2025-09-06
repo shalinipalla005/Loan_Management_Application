@@ -385,37 +385,10 @@ exports.updateLoan = async (req, res) => {
       });
     }
 
-    // If payment is being made, update outstanding amounts
+    // Remove payment processing logic - payments should only be processed through paymentController
+    // This prevents double deduction of outstanding amounts
     if (updateData.payment_amount) {
-      const paymentAmount = parseFloat(updateData.payment_amount);
-      
-      // First pay off interest, then principal
-      let remainingPayment = paymentAmount;
-      let newOutstandingInterest = parseFloat(loan.outstanding_interest);
-      let newOutstandingPrincipal = parseFloat(loan.outstanding_principal);
-
-      if (remainingPayment > 0 && newOutstandingInterest > 0) {
-        const interestPayment = Math.min(remainingPayment, newOutstandingInterest);
-        newOutstandingInterest -= interestPayment;
-        remainingPayment -= interestPayment;
-      }
-
-      if (remainingPayment > 0 && newOutstandingPrincipal > 0) {
-        const principalPayment = Math.min(remainingPayment, newOutstandingPrincipal);
-        newOutstandingPrincipal -= principalPayment;
-      }
-
-      updateData.outstanding_interest = newOutstandingInterest;
-      updateData.outstanding_principal = newOutstandingPrincipal;
-
-      // Update loan status if fully paid
-      if (newOutstandingInterest === 0 && newOutstandingPrincipal === 0) {
-        updateData.loan_status = 'CLOSED';
-      } else if (loan.loan_status === 'PENDING') {
-        updateData.loan_status = 'ACTIVE';
-      }
-
-      // Remove payment_amount from updateData as it's not a field in the model
+      console.warn('Payment processing detected in updateLoan - this should be handled by paymentController');
       delete updateData.payment_amount;
     }
 

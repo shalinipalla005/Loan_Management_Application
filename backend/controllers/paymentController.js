@@ -172,7 +172,7 @@ exports.create = async (req, res) => {
       newStatusLoan = 'ACTIVE';
     }
 
-    console.log('=== PAYMENT PROCESSING ===');
+    console.log('=== PAYMENT PROCESSING (SINGLE DEDUCTION) ===');
     console.log('BEFORE payment - Loan outstanding amounts:', {
       outstanding_principal: loan.outstanding_principal,
       outstanding_interest: loan.outstanding_interest
@@ -187,7 +187,7 @@ exports.create = async (req, res) => {
       newOutstandingPrincipal,
       newOutstandingInterest
     });
-    console.log('=== END PAYMENT PROCESSING ===');
+    console.log('=== END PAYMENT PROCESSING (SINGLE DEDUCTION) ===');
 
     // Update loan with new outstanding amounts
     await loan.update({
