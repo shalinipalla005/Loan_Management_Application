@@ -1,5 +1,6 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const { spawn } = require('child_process');
 
 let mainWindow = null;
 let backendProcess = null; // retained for dev-only scenarios
@@ -15,8 +16,8 @@ function resolveBackendEntry() {
   return path.join(appPath, 'backend', 'server.js');
 }
 
-// Default to local backend; switch to hosted by setting REMOTE_BACKEND_URL
-const REMOTE_BACKEND_URL = process.env.REMOTE_BACKEND_URL || '';
+// Default to remote backend for packaged app; use local for development
+const REMOTE_BACKEND_URL = process.env.REMOTE_BACKEND_URL || (app.isPackaged ? 'https://loan-management-application.onrender.com/api' : '');
 
 async function startBackend() {
   // Hosted backend mode: do not start local server
@@ -37,35 +38,10 @@ async function startBackend() {
   };
 
   if (app.isPackaged) {
-    // Production: run backend as a separate Node process using Electron's Node (ELECTRON_RUN_AS_NODE).
-    return new Promise((resolve, reject) => {
-      const env = { ...baseEnv, ELECTRON_RUN_AS_NODE: '1' };
-      const cwd = path.dirname(backendEntry);
-      const nodeExecutable = process.execPath; // installed app exe (acts like node when ELECTRON_RUN_AS_NODE)
-      backendProcess = spawn(nodeExecutable, [backendEntry], { env, cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-
-      let resolved = false;
-      const onReady = () => {
-        if (!resolved) {
-          resolved = true;
-          resolve();
-        }
-      };
-      const readyRegex = /Server is running on port/i;
-      backendProcess.stdout.on('data', (data) => {
-        const text = data.toString();
-        if (readyRegex.test(text)) onReady();
-        console.log(`[backend] ${text.trim()}`);
-      });
-      backendProcess.stderr.on('data', (data) => {
-        console.error(`[backend:error] ${data.toString().trim()}`);
-      });
-      backendProcess.on('exit', (code) => {
-        console.log(`[backend] exited with code ${code}`);
-        if (!resolved) reject(new Error(`Backend exited early with code ${code}`));
-      });
-      setTimeout(onReady, 8000);
-    });
+    // For packaged app, we'll use the remote backend instead of spawning a local one
+    // This avoids the complex path resolution issues
+    console.log('Packaged app detected - using remote backend');
+    return Promise.resolve();
   }
 
   // Development: fork a separate Node child process
