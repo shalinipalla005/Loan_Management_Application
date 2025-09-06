@@ -72,6 +72,17 @@ exports.create = async (req, res) => {
     let savingsPaid = parseFloat(req.body.savings_paid || 0);
     const totalPaid = parseFloat(req.body.payment_amount);
 
+    // Debug logging
+    console.log('Payment amounts from frontend:', {
+      principalPaid,
+      interestPaid,
+      savingsPaid,
+      penaltyPaid,
+      totalPaid,
+      outstandingPrincipal: loan.outstanding_principal,
+      outstandingInterest: loan.outstanding_interest
+    });
+
     // Validate that the sum of individual amounts equals the total payment amount
     const calculatedTotal = penaltyPaid + interestPaid + principalPaid + savingsPaid;
     if (Math.abs(calculatedTotal - totalPaid) > 0.01) {
@@ -116,17 +127,15 @@ exports.create = async (req, res) => {
       return res.status(400).json({ error: "This installment is already fully paid. Please proceed to the next installment." });
     }
 
-    // Validate payment amounts against schedule requirements
-    const remainingPenalty = Math.max(0, parseFloat(schedule.penalty_applied || 0) - parseFloat(schedule.paid_amount || 0));
-    const remainingInterest = Math.max(0, parseFloat(schedule.interest_amount || 0) - parseFloat(schedule.paid_amount || 0));
-    const remainingPrincipal = Math.max(0, parseFloat(schedule.principal_amount || 0) - parseFloat(schedule.paid_amount || 0));
-    const remainingSavings = Math.max(0, parseFloat(schedule.monthly_savings || 0) - parseFloat(schedule.paid_amount || 0));
-
-    // Warn if payment exceeds what's due for this installment
-    if (penaltyPaid > remainingPenalty || interestPaid > remainingInterest || 
-        principalPaid > remainingPrincipal || savingsPaid > remainingSavings) {
-      console.warn('Payment amounts exceed remaining amounts for this installment');
-    }
+    // Allow user to pay any amount they want - no strict validation against schedule
+    // The user has flexibility to pay whatever amount they want against the loan
+    console.log('Processing payment with user-specified amounts:', {
+      principalPaid,
+      interestPaid,
+      savingsPaid,
+      penaltyPaid,
+      totalPaid
+    });
 
     // Update schedule with the payment
     const updatedPaidAmount = (parseFloat(schedule.paid_amount || 0) + totalPaid).toFixed(2);
@@ -156,6 +165,16 @@ exports.create = async (req, res) => {
     } else if (loan.loan_status === 'PENDING') {
       newStatusLoan = 'ACTIVE';
     }
+
+    console.log('Loan outstanding calculation:', {
+      currentOutstandingPrincipal: loan.outstanding_principal,
+      principalPaid,
+      newOutstandingPrincipal,
+      currentOutstandingInterest: loan.outstanding_interest,
+      interestPaid,
+      newOutstandingInterest
+    });
+
     await loan.update({
       outstanding_principal: newOutstandingPrincipal.toFixed(2),
       outstanding_interest: newOutstandingInterest.toFixed(2),
