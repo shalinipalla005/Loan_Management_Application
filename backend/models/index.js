@@ -14,28 +14,46 @@ const AuditLog = require('./AuditLog');
 
 // Associations
 Member.belongsTo(Society, { foreignKey: 'society_id' });
-Loan.belongsTo(Member, { foreignKey: 'member_id' });
+Loan.belongsTo(Member, { foreignKey: 'member_id', as: 'member' });
 Member.hasMany(Loan, { foreignKey: 'member_id' });
 Loan.belongsTo(Society, { foreignKey: 'society_id' });
 Loan.belongsTo(LoanOfficer, { foreignKey: 'officer_id' });
 Loan.belongsTo(LoanProduct, { foreignKey: 'product_id' });
 LoanOfficer.belongsTo(Society, { foreignKey: 'society_id' });
 LoanProduct.belongsTo(Society, { foreignKey: 'society_id' });
+
+// RepaymentSchedule associations
 RepaymentSchedule.belongsTo(Loan, { foreignKey: 'loan_id' });
+Loan.hasMany(RepaymentSchedule, { foreignKey: 'loan_id', as: 'RepaymentSchedules' });
+
+// Payment associations
 Payment.belongsTo(Loan, { foreignKey: 'loan_id' });
+Loan.hasMany(Payment, { foreignKey: 'loan_id', as: 'Payments' });
 Payment.belongsTo(RepaymentSchedule, { foreignKey: 'schedule_id' });
 Payment.belongsTo(Member, { foreignKey: 'member_id' });
 Payment.belongsTo(LoanOfficer, { foreignKey: 'processed_by' });
+
+// MemberSavings associations
 MemberSavings.belongsTo(Member, { foreignKey: 'member_id' });
 MemberSavings.belongsTo(Loan, { foreignKey: 'loan_id' });
+Loan.hasMany(MemberSavings, { foreignKey: 'loan_id', as: 'MemberSavings' });
 MemberSavings.belongsTo(LoanOfficer, { foreignKey: 'processed_by' });
+
+// Penalty associations
 Penalty.belongsTo(Loan, { foreignKey: 'loan_id' });
+Loan.hasMany(Penalty, { foreignKey: 'loan_id', as: 'Penalties' });
 Penalty.belongsTo(RepaymentSchedule, { foreignKey: 'schedule_id' });
 Penalty.belongsTo(LoanOfficer, { foreignKey: 'waived_by' });
+
+// LoanStatusHistory associations
 LoanStatusHistory.belongsTo(Loan, { foreignKey: 'loan_id' });
 LoanStatusHistory.belongsTo(LoanOfficer, { foreignKey: 'changed_by' });
+
+// MemberDocument associations
 MemberDocument.belongsTo(Member, { foreignKey: 'member_id' });
 MemberDocument.belongsTo(LoanOfficer, { foreignKey: 'uploaded_by' });
+
+// AuditLog associations
 AuditLog.belongsTo(LoanOfficer, { foreignKey: 'user_id' });
 
 const getUserIdFromOptions = (options) => (options && options.user && options.user.officer_id) ? options.user.officer_id : null;

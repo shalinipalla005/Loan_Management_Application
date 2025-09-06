@@ -6,6 +6,7 @@ import {
   Paper, Box, Alert, Snackbar, MenuItem, TableContainer 
 } from '@mui/material';
 import GetAppIcon from '@mui/icons-material/GetApp';
+import LoanProfileDialog from '../components/LoanProfileDialog';
 
 export default function Loans() {
   const role = (() => {
@@ -181,9 +182,12 @@ export default function Loans() {
   const handleOpenProfile = async (loanId) => {
     setProfileLoading(true);
     try {
-      const { data } = await api.get(`/loans/${loanId}`);
+      const { data } = await api.get(`/loanprofiles/${loanId}`);
       setProfileLoan(data.data);
       setProfileOpen(true);
+    } catch (err) {
+      setError('Failed to load loan profile');
+      console.error('Profile error:', err);
     } finally {
       setProfileLoading(false);
     }
@@ -392,23 +396,12 @@ export default function Loans() {
           </Snackbar>
 
           {/* Profile Dialog */}
-          <Dialog open={profileOpen} onClose={handleCloseProfile} maxWidth="lg" fullWidth>
-            <DialogTitle>Loan Profile</DialogTitle>
-            <DialogContent>
-              {profileLoading || !profileLoan ? <Typography>Loading...</Typography> : (
-                <Box>
-                  <Typography variant="h6">Loan Number: {profileLoan.loan_number}</Typography>
-                  <Typography>Member: {profileLoan.member?.member_name}</Typography>
-                  <Typography>Amount: ₹{profileLoan.loan_amount}</Typography>
-                  <Typography>Status: {profileLoan.loan_status}</Typography>
-                  {/* Repayment, Payments, Penalties, Savings Tables (unchanged) */}
-                </Box>
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={handleCloseProfile}>Close</Button>
-            </DialogActions>
-          </Dialog>
+          <LoanProfileDialog 
+            open={profileOpen}
+            onClose={handleCloseProfile}
+            profileLoan={profileLoan}
+            loading={profileLoading}
+          />
         </Paper>
       </Box>
     </Box>

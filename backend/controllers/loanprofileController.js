@@ -283,10 +283,26 @@ exports.getLoanById = async (req, res) => {
           as: 'member',
           attributes: ['member_id', 'member_name', 'membership_number', 'contact_number', 'email', 'address']
         },
-        require('../models/RepaymentSchedule'),
-        Payment,
-        Penalty,
-        MemberSavings
+        {
+          model: RepaymentSchedule,
+          as: 'RepaymentSchedules',
+          order: [['installment_number', 'ASC']]
+        },
+        {
+          model: Payment,
+          as: 'Payments',
+          order: [['payment_date', 'DESC']]
+        },
+        {
+          model: Penalty,
+          as: 'Penalties',
+          order: [['created_at', 'DESC']]
+        },
+        {
+          model: MemberSavings,
+          as: 'MemberSavings',
+          order: [['transaction_date', 'DESC']]
+        }
       ]
     });
 
@@ -297,9 +313,53 @@ exports.getLoanById = async (req, res) => {
       });
     }
 
+    // Calculate summary statistics
+    const totalPaid = loan.Payments?.reduce((sum, payment) => sum + parseFloat(payment.payment_amount || 0), 0) || 0;
+    const totalPrincipalPaid = loan.Payments?.reduce((sum, payment) => sum + parseFloat(payment.principal_paid || 0), 0) || 0;
+    const totalInterestPaid = loan.Payments?.reduce((sum, payment) => sum + parseFloat(payment.interest_paid || 0), 0) || 0;
+    const totalSavingsPaid = loan.Payments?.reduce((sum, payment) => sum + parseFloat(payment.savings_paid || 0), 0) || 0;
+    const totalPenaltyPaid = loan.Payments?.reduce((sum, payment) => sum + parseFloat(payment.penalty_paid || 0), 0) || 0;
+
+    // Get upcoming payments (PENDING and PARTIAL status)
+    const upcomingPayments = loan.RepaymentSchedules?.filter(schedule => 
+      schedule.payment_status === 'PENDING' || schedule.payment_status === 'PARTIAL'
+    ) || [];
+
+    // Get overdue payments
+    const currentDate = new Date();
+    const overduePayments = loan.RepaymentSchedules?.filter(schedule => {
+      const dueDate = new Date(schedule.due_date);
+      return (schedule.payment_status === 'PENDING' || schedule.payment_status === 'PARTIAL') && 
+             dueDate < currentDate;
+    }) || [];
+
+    // Calculate loan progress
+    const totalLoanAmount = parseFloat(loan.loan_amount || 0);
+    const progressPercentage = totalLoanAmount > 0 ? (totalPrincipalPaid / totalLoanAmount) * 100 : 0;
+
+    const loanProfile = {
+      ...loan.toJSON(),
+      summary: {
+        totalPaid,
+        totalPrincipalPaid,
+        totalInterestPaid,
+        totalSavingsPaid,
+        totalPenaltyPaid,
+        progressPercentage: Math.round(progressPercentage * 100) / 100,
+        remainingPrincipal: parseFloat(loan.outstanding_principal || 0),
+        remainingInterest: parseFloat(loan.outstanding_interest || 0)
+      },
+      upcomingPayments,
+      overduePayments,
+      paymentHistory: loan.Payments || [],
+      repaymentSchedule: loan.RepaymentSchedules || [],
+      penalties: loan.Penalties || [],
+      savings: loan.MemberSavings || []
+    };
+
     res.status(200).json({
       success: true,
-      data: loan
+      data: loanProfile
     });
   } catch (error) {
     console.error('Error fetching loan:', error);
