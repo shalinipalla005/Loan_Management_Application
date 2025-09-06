@@ -157,10 +157,7 @@ exports.create = async (req, res) => {
       payment_status: newStatus
     });
 
-    // After payment, redistribute remaining amounts across remaining months
-    await redistributeScheduleAfterPayment(loan.loan_id, principalPaid, interestPaid, savingsPaid, penaltyPaid);
-
-    // Update loan outstanding - penalties are added to principal
+    // Update loan outstanding FIRST - penalties are added to principal
     let newOutstandingPrincipal = parseFloat(loan.outstanding_principal) - principalPaid + penaltyPaid;
     let newOutstandingInterest = parseFloat(loan.outstanding_interest) - interestPaid;
     let newStatusLoan = loan.loan_status;
@@ -185,11 +182,15 @@ exports.create = async (req, res) => {
       newOutstandingInterest
     });
 
+    // Update loan with new outstanding amounts
     await loan.update({
       outstanding_principal: newOutstandingPrincipal.toFixed(2),
       outstanding_interest: newOutstandingInterest.toFixed(2),
       loan_status: newStatusLoan
     });
+
+    // After updating loan outstanding amounts, redistribute remaining amounts across remaining months
+    await redistributeScheduleAfterPayment(loan.loan_id, principalPaid, interestPaid, savingsPaid, penaltyPaid);
 
     // Save payment record with correct amounts
     const paymentData = {
@@ -253,7 +254,7 @@ async function redistributeScheduleAfterPayment(loanId, principalPaid, interestP
   try {
     console.log('Starting schedule redistribution for loan:', loanId);
     
-    // Get the loan details
+    // Get the updated loan details (outstanding amounts should be updated by now)
     const loan = await Loan.findByPk(loanId);
     if (!loan) {
       console.error('Loan not found for redistribution:', loanId);
@@ -274,18 +275,21 @@ async function redistributeScheduleAfterPayment(loanId, principalPaid, interestP
       return;
     }
 
-    // Calculate remaining amounts after this payment
-    // Penalties are added to principal, so the remaining principal includes penalties
-    const remainingPrincipal = parseFloat(loan.outstanding_principal) - principalPaid + penaltyPaid;
-    const remainingInterest = parseFloat(loan.outstanding_interest) - interestPaid;
+    // Use the updated outstanding amounts from the loan (already updated in payment processing)
+    const remainingPrincipal = parseFloat(loan.outstanding_principal);
+    const remainingInterest = parseFloat(loan.outstanding_interest);
     const remainingMonths = pendingSchedules.length;
     const monthlySavings = parseFloat(loan.monthly_savings || 0);
 
     console.log('Redistribution parameters:', {
+      loanId,
       remainingPrincipal,
       remainingInterest,
       remainingMonths,
-      monthlySavings
+      monthlySavings,
+      principalPaid,
+      interestPaid,
+      penaltyPaid
     });
 
     // Get the next due date (from the first pending schedule)
