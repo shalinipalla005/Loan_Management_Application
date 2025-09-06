@@ -65,27 +65,50 @@ export default function Sidebar() {
     setExportLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const baseURL = (window.electron && window.electron.env && window.electron.env.backendURL) || '';
-      let url = `${baseURL}/loans/export`;
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.');
+      }
+      
+      const baseURL = (window.electron && window.electron.env && window.electron.env.backendURL) || 'http://localhost:3000';
+      let url = `${baseURL}/api/loans/export`;
       let filename = 'all_loans_export.xlsx';
       let contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
       if (format === 'pdf') {
-        url = `${baseURL}/loans/export/pdf`;
+        url = `${baseURL}/api/loans/export/pdf`;
         filename = 'all_loans_export.pdf';
         contentType = 'application/pdf';
       }
 
+      console.log('Exporting to URL:', url);
+      
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` }
+        method: 'GET',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
-      if (!res.ok) throw new Error('Failed to export');
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Export failed:', res.status, errorText);
+        throw new Error(`Export failed: ${res.status} - ${errorText}`);
+      }
+      
       const blob = await res.blob();
+      
+      // Check if the response is actually an Excel file
+      if (blob.size === 0) {
+        throw new Error('Received empty file from server');
+      }
+      
       // Try to get filename from header
       const disposition = res.headers.get('Content-Disposition');
       if (disposition && disposition.includes('filename=')) {
         filename = disposition.split('filename=')[1].replace(/"/g, '');
       }
+      
       const urlBlob = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = urlBlob;
@@ -94,8 +117,11 @@ export default function Sidebar() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(urlBlob);
+      
+      console.log('Export successful');
     } catch (err) {
-      alert('Export failed');
+      console.error('Export error:', err);
+      alert(`Export failed: ${err.message}`);
     }
     setExportLoading(false);
     setExportDialogOpen(false);

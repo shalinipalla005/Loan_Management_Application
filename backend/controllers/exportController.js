@@ -1,4 +1,4 @@
-const { Loan, Member, Society, LoanOfficer, LoanProduct, sequelize } = require('../models');
+const { Loan, Member, Society, LoanOfficer, LoanProduct, RepaymentSchedule, Payment, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const excel4node = require('excel4node');
 const fs = require('fs');
@@ -13,6 +13,7 @@ class ExportController {
         include: [
           {
             model: Member,
+            as: 'member',
             attributes: ['member_name', 'membership_number', 'contact_number', 'email']
           },
           {
@@ -35,10 +36,10 @@ class ExportController {
       const exportData = loans.map(loan => ({
         'Loan ID': loan.loan_id,
         'Loan Number': loan.loan_number,
-        'Member Name': loan.Member?.member_name || '',
-        'Membership Number': loan.Member?.membership_number || '',
-        'Contact': loan.Member?.contact_number || '',
-        'Email': loan.Member?.email || '',
+        'Member Name': loan.member?.member_name || '',
+        'Membership Number': loan.member?.membership_number || '',
+        'Contact': loan.member?.contact_number || '',
+        'Email': loan.member?.email || '',
         'Society': loan.Society?.society_name || '',
         'Officer': loan.LoanOfficer?.officer_name || '',
         'Product': loan.LoanProduct?.product_name || '',
@@ -190,6 +191,7 @@ class ExportController {
         include: [
           {
             model: Member,
+            as: 'member',
             attributes: ['member_name', 'membership_number', 'contact_number', 'email', 'address']
           },
           {
@@ -203,7 +205,19 @@ class ExportController {
           {
             model: LoanProduct,
             attributes: ['product_name', 'interest_rate', 'processing_fee_rate', 'monthly_savings_required']
+          },
+          {
+            model: RepaymentSchedule,
+            as: 'RepaymentSchedules'
+          },
+          {
+            model: Payment,
+            as: 'Payments'
           }
+        ],
+        order: [
+          [{ model: RepaymentSchedule, as: 'RepaymentSchedules' }, 'installment_number', 'ASC'],
+          [{ model: Payment, as: 'Payments' }, 'payment_date', 'ASC']
         ]
       });
 
@@ -269,11 +283,11 @@ class ExportController {
       const loanProfileData = [
         ['Loan ID', loan.loan_id],
         ['Loan Number', loan.loan_number],
-        ['Member Name', loan.Member?.member_name || ''],
-        ['Membership Number', loan.Member?.membership_number || ''],
-        ['Contact Number', loan.Member?.contact_number || ''],
-        ['Email', loan.Member?.email || ''],
-        ['Address', loan.Member?.address || ''],
+        ['Member Name', loan.member?.member_name || ''],
+        ['Membership Number', loan.member?.membership_number || ''],
+        ['Contact Number', loan.member?.contact_number || ''],
+        ['Email', loan.member?.email || ''],
+        ['Address', loan.member?.address || ''],
         ['Society', loan.Society?.society_name || ''],
         ['Loan Officer', loan.LoanOfficer?.officer_name || ''],
         ['Product Name', loan.LoanProduct?.product_name || ''],
@@ -319,65 +333,64 @@ class ExportController {
       profileSheet.column(1).setWidth(25);
       profileSheet.column(2).setWidth(30);
 
-      // Try to generate loan schedule, but don't fail if it doesn't work
-      let schedule = [];
-      try {
-        schedule = generateLoanSchedule({
-          loan_amount: loan.loan_amount,
-          interest_rate: loan.interest_rate,
-          tenure_months: loan.tenure_months,
-          monthly_savings: loan.monthly_savings,
-          first_due_date: loan.first_due_date,
-          disbursement_date: loan.disbursement_date
-        });
-      } catch (scheduleError) {
-        console.warn('Could not generate loan schedule:', scheduleError.message);
-        schedule = [];
-      }
-
-      // Add schedule sheet if available
-      if (schedule && schedule.length > 0) {
-        const scheduleSheet = workbook.addWorksheet('Payment Schedule');
+      // Add repayment schedule sheet using actual data
+      if (loan.RepaymentSchedules && loan.RepaymentSchedules.length > 0) {
+        const scheduleSheet = workbook.addWorksheet('Repayment Schedule');
         
         // Schedule headers
-        const scheduleHeaders = ['S.No.', 'Due Date', 'Opening Balance', 'Principal', 'Interest', 'Closing Balance', 'Monthly Savings', 'Total Payment', 'Status'];
+        const scheduleHeaders = [
+          'Installment', 'Due Date', 'Opening Balance', 'Principal', 'Interest', 
+          'Savings', 'Total', 'Paid', 'Status', 'Paid Date'
+        ];
         
         scheduleHeaders.forEach((header, index) => {
           scheduleSheet.cell(1, index + 1).string(header).style(headerStyle);
           scheduleSheet.column(index + 1).setWidth(15);
         });
 
-        // Schedule data
-        schedule.forEach((row, rowIndex) => {
-          scheduleSheet.cell(rowIndex + 2, 1).number(rowIndex + 1).style(cellStyle);
-          
-          // Handle due date properly
-          if (row['Due Date']) {
-            try {
-              const dateValue = new Date(row['Due Date']);
-              if (!isNaN(dateValue.getTime())) {
-                scheduleSheet.cell(rowIndex + 2, 2).date(dateValue).style(dateStyle);
-              } else {
-                scheduleSheet.cell(rowIndex + 2, 2).string(row['Due Date'].toString()).style(cellStyle);
-              }
-            } catch (e) {
-              scheduleSheet.cell(rowIndex + 2, 2).string(row['Due Date'].toString()).style(cellStyle);
-            }
-          } else {
-            scheduleSheet.cell(rowIndex + 2, 2).string('').style(cellStyle);
-          }
-          
-          // Calculate opening balance based on loan amount and previous payments
-          const openingBalance = rowIndex === 0 ? 
-            parseFloat(loan.loan_amount || 0) : 
-            parseFloat(schedule[rowIndex-1]['Remaining Principal'] || 0);
-          scheduleSheet.cell(rowIndex + 2, 3).number(openingBalance).style(numberStyle);
-          scheduleSheet.cell(rowIndex + 2, 4).number(parseFloat(row['Principal'] || 0)).style(numberStyle);
-          scheduleSheet.cell(rowIndex + 2, 5).number(parseFloat(row['Interest'] || 0)).style(numberStyle);
-          scheduleSheet.cell(rowIndex + 2, 6).number(parseFloat(row['Remaining Principal'] || 0)).style(numberStyle);
-          scheduleSheet.cell(rowIndex + 2, 7).number(parseFloat(row['Savings'] || 0)).style(numberStyle);
-          scheduleSheet.cell(rowIndex + 2, 8).number(parseFloat(row['Total Amount'] || 0)).style(numberStyle);
-          scheduleSheet.cell(rowIndex + 2, 9).string(row['Status'] || 'PENDING').style(cellStyle);
+        // Add schedule data
+        loan.RepaymentSchedules.forEach((schedule, index) => {
+          const row = index + 2;
+          scheduleSheet.cell(row, 1).number(schedule.installment_number).style(cellStyle);
+          scheduleSheet.cell(row, 2).date(new Date(schedule.due_date)).style(dateStyle);
+          scheduleSheet.cell(row, 3).number(parseFloat(schedule.opening_balance || 0)).style(numberStyle);
+          scheduleSheet.cell(row, 4).number(parseFloat(schedule.principal_amount || 0)).style(numberStyle);
+          scheduleSheet.cell(row, 5).number(parseFloat(schedule.interest_amount || 0)).style(numberStyle);
+          scheduleSheet.cell(row, 6).number(parseFloat(schedule.monthly_savings || 0)).style(numberStyle);
+          scheduleSheet.cell(row, 7).number(parseFloat(schedule.total_installment || 0)).style(numberStyle);
+          scheduleSheet.cell(row, 8).number(parseFloat(schedule.paid_amount || 0)).style(numberStyle);
+          scheduleSheet.cell(row, 9).string(schedule.payment_status || 'PENDING').style(cellStyle);
+          scheduleSheet.cell(row, 10).string(schedule.paid_date ? new Date(schedule.paid_date).toISOString().split('T')[0] : '').style(cellStyle);
+        });
+      }
+
+      // Add payment history sheet if payments exist
+      if (loan.Payments && loan.Payments.length > 0) {
+        const paymentSheet = workbook.addWorksheet('Payment History');
+        
+        // Payment headers
+        const paymentHeaders = [
+          'Date', 'Receipt No.', 'Total Amount', 'Principal', 'Interest', 
+          'Savings', 'Penalty', 'Method', 'Remarks'
+        ];
+        
+        paymentHeaders.forEach((header, index) => {
+          paymentSheet.cell(1, index + 1).string(header).style(headerStyle);
+          paymentSheet.column(index + 1).setWidth(15);
+        });
+
+        // Add payment data
+        loan.Payments.forEach((payment, index) => {
+          const row = index + 2;
+          paymentSheet.cell(row, 1).date(new Date(payment.payment_date)).style(dateStyle);
+          paymentSheet.cell(row, 2).string(payment.receipt_number || '').style(cellStyle);
+          paymentSheet.cell(row, 3).number(parseFloat(payment.payment_amount || 0)).style(numberStyle);
+          paymentSheet.cell(row, 4).number(parseFloat(payment.principal_paid || 0)).style(numberStyle);
+          paymentSheet.cell(row, 5).number(parseFloat(payment.interest_paid || 0)).style(numberStyle);
+          paymentSheet.cell(row, 6).number(parseFloat(payment.savings_paid || 0)).style(numberStyle);
+          paymentSheet.cell(row, 7).number(parseFloat(payment.penalty_paid || 0)).style(numberStyle);
+          paymentSheet.cell(row, 8).string(payment.payment_method || '').style(cellStyle);
+          paymentSheet.cell(row, 9).string(payment.remarks || '').style(cellStyle);
         });
       }
 
