@@ -1,6 +1,7 @@
 const { Payment, Loan, RepaymentSchedule } = require('../models');
 const { Op } = require('sequelize');
 const IDGenerator = require('../utils/idGenerator');
+const { redistributeRemainingAmounts } = require('../utils/helpers');
 
 
 
@@ -156,10 +157,18 @@ exports.create = async (req, res) => {
       payment_status: newStatus
     });
 
-    // Update loan outstanding
-    let newOutstandingPrincipal = parseFloat(loan.outstanding_principal) - principalPaid;
+    // After payment, redistribute remaining amounts across remaining months
+    await redistributeScheduleAfterPayment(loan.loan_id, principalPaid, interestPaid, savingsPaid, penaltyPaid);
+
+    // Update loan outstanding - penalties are added to principal
+    let newOutstandingPrincipal = parseFloat(loan.outstanding_principal) - principalPaid + penaltyPaid;
     let newOutstandingInterest = parseFloat(loan.outstanding_interest) - interestPaid;
     let newStatusLoan = loan.loan_status;
+    
+    // Ensure outstanding amounts don't go negative
+    newOutstandingPrincipal = Math.max(0, newOutstandingPrincipal);
+    newOutstandingInterest = Math.max(0, newOutstandingInterest);
+    
     if (newOutstandingPrincipal <= 0 && newOutstandingInterest <= 0) {
       newStatusLoan = 'CLOSED';
     } else if (loan.loan_status === 'PENDING') {
@@ -169,6 +178,7 @@ exports.create = async (req, res) => {
     console.log('Loan outstanding calculation:', {
       currentOutstandingPrincipal: loan.outstanding_principal,
       principalPaid,
+      penaltyPaid,
       newOutstandingPrincipal,
       currentOutstandingInterest: loan.outstanding_interest,
       interestPaid,
@@ -237,3 +247,89 @@ exports.delete = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// Function to redistribute remaining amounts after payment
+async function redistributeScheduleAfterPayment(loanId, principalPaid, interestPaid, savingsPaid, penaltyPaid) {
+  try {
+    console.log('Starting schedule redistribution for loan:', loanId);
+    
+    // Get the loan details
+    const loan = await Loan.findByPk(loanId);
+    if (!loan) {
+      console.error('Loan not found for redistribution:', loanId);
+      return;
+    }
+
+    // Get all pending and partial schedules
+    const pendingSchedules = await RepaymentSchedule.findAll({
+      where: {
+        loan_id: loanId,
+        payment_status: ['PENDING', 'PARTIAL']
+      },
+      order: [['installment_number', 'ASC']]
+    });
+
+    if (pendingSchedules.length === 0) {
+      console.log('No pending schedules to redistribute for loan:', loanId);
+      return;
+    }
+
+    // Calculate remaining amounts after this payment
+    // Penalties are added to principal, so the remaining principal includes penalties
+    const remainingPrincipal = parseFloat(loan.outstanding_principal) - principalPaid + penaltyPaid;
+    const remainingInterest = parseFloat(loan.outstanding_interest) - interestPaid;
+    const remainingMonths = pendingSchedules.length;
+    const monthlySavings = parseFloat(loan.monthly_savings || 0);
+
+    console.log('Redistribution parameters:', {
+      remainingPrincipal,
+      remainingInterest,
+      remainingMonths,
+      monthlySavings
+    });
+
+    // Get the next due date (from the first pending schedule)
+    const nextDueDate = pendingSchedules[0].due_date;
+
+    // Generate new schedule with redistributed amounts
+    const newSchedule = redistributeRemainingAmounts(
+      loanId,
+      remainingPrincipal,
+      remainingInterest,
+      remainingMonths,
+      monthlySavings,
+      nextDueDate
+    );
+
+    // Delete existing pending/partial schedules
+    await RepaymentSchedule.destroy({
+      where: {
+        loan_id: loanId,
+        payment_status: ['PENDING', 'PARTIAL']
+      }
+    });
+
+    // Create new schedules
+    const scheduleRows = newSchedule.map((item, idx) => ({
+      loan_id: loanId,
+      installment_number: pendingSchedules[0].installment_number + idx,
+      due_date: item['Due Date'],
+      opening_balance: (remainingPrincipal - (parseFloat(item['Principal']) * idx)).toFixed(2),
+      principal_amount: item['Principal'],
+      interest_amount: item['Interest'],
+      monthly_savings: item['Savings'],
+      total_installment: item['Total Amount'],
+      closing_balance: item['Remaining Principal'],
+      payment_status: 'PENDING',
+      paid_date: null,
+      paid_amount: 0.00,
+      penalty_applied: 0.00
+    }));
+
+    await RepaymentSchedule.bulkCreate(scheduleRows);
+    console.log(`Redistributed ${scheduleRows.length} schedules for loan ${loanId}`);
+
+  } catch (error) {
+    console.error('Error redistributing schedule:', error);
+  }
+}
